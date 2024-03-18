@@ -24,6 +24,16 @@ setup(
             'data/*',
         ],
     },
+    docs_require = [
+    "sphinx",
+    "sphinx-automodapi",
+    "sphinx_argparse",
+    "sphinx_rtd_theme",
+    "numpydoc",
+    "nbsphinx",
+    "sphinxcontrib-mermaid",
+    "sphinx-togglebutton"
+    ],
     tests_require=[
         'pytest',
     ],
