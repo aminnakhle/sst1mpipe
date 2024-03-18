@@ -9,7 +9,7 @@
 project = 'sst1mpipe'
 copyright = '2024, SST-1M collaboration'
 author = 'SST-1M collaboration'
-release = '0.1'
+release = sst1mpipe.__version__
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
