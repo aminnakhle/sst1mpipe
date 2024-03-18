@@ -1,6 +1,10 @@
 # SST-1M pipeline
 
-The [sst1mpipe](https://github.com/SST-1M-collaboration/sst1mpipe) repository serves for the analysis of <b>SST-1M prototype</b>. It is based on [ctapipe](https://github.com/cta-observatory/ctapipe).
+The [sst1mpipe](https://github.com/SST-1M-collaboration/sst1mpipe) repository serves for data processing and  analysis of the <b>SST-1M prototype</b>. There are currently two SST-1M telescopes installed in Ondrejov, Czech Republic, working in mono and stereo regime of observations. It based on [ctapipe](https://github.com/cta-observatory/ctapipe) and inspired by [cta-lstchain](https://github.com/cta-observatory/cta-lstchain). Some funcionalities for stereoscopic reconstruction are inspired by [magic-cta-pipe](https://github.com/cta-observatory/magic-cta-pipe).
+
+**NOTE ON OLD RELEASES**
+
+v0.3.5 of *sst1mpipe* was the last one before the repository was made public. Old releases are available only to the members of SST-1M Consortium and can be found in a privare repository [sst1mpipe-old](https://github.com/SST-1M-collaboration/sst1mpipe-old).
 
 ## Installation
 
@@ -24,11 +28,11 @@ bash Mambaforge-$(uname)-$(uname -m).sh
 
 
 ### For users
-- download stable version of <b>sst1mpipe</b> (latest version = 0.0.0)
+- download stable version of <b>sst1mpipe</b> (latest version = 0.4.0)
 - create and activate <b>conda</b> environment
 - install <b>sst1mpipe</b>
 ```
-SST1MPIPE_VER=0.0.0
+SST1MPIPE_VER=0.4.0
 
 wget https://raw.githubusercontent.com/SST-1M-collaboration/sst1mpipe/v$SST1MPIPE_VER/environment.yml
 
