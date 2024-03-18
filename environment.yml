@@ -1,0 +1,17 @@
+name: sst1m-dev
+channels:
+  - conda-forge
+  - default
+dependencies:
+  - python=3.8
+  - pip
+  - ctapipe=0.17
+  - gammapy=1.0
+  - jupyter
+  - protozfits=2.0
+  - astroquery=0.4.6
+  - pydantic<2.0
+  - pip:
+      - ctaplot~=0.6.2
+      - pyirf~=0.8.0
+      - git+https://github.com/cta-sst-1m/CTS.git

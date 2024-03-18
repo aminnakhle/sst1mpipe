@@ -1,0 +1,16 @@
+{
+    "n_proc" : 15,
+    "config_file" :"/data/work/analysis/Daily_analysis/default_sst1mpipe_data_config_analysis.json",
+    "year" : 2023,
+    "month":10,
+    "day"  :11,
+    "cs1"   : true,
+    "cs2"   : true,
+    "stereo": true,
+
+    "ana_dir" : "/data/work/analysis/Daily_analysis/",
+    "irf_dir": "/data/work/analysis/IRFs/",
+    "mono_model_dir":"/data/work/analysis/MC/prod_january_2023/v0.2.0/models_mono_psf_vaod0.2/",
+    "stereo_model_dir":"/data/work/analysis/MC/prod_january_2023/v0.2.0/models_stereo_psf_vaod0.2/"
+}
+

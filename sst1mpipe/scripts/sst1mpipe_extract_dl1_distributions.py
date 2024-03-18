@@ -1,0 +1,232 @@
+#!/usr/bin/env python
+
+"""
+A script to calculate DL1 Hillas Intensity rates per obs ID (~wobble). This is needed 
+for run selection, and cannot be done per-file due to statistics.
+- Inputs are a directory with DL1 real data files and a directory with DL3 index files.
+- Outputs are per-obsid intensity distributions stored in HDF tables.
+
+Usage:
+
+$> python sst1mpipe_extract_dl1_distributions.py
+--dl1-dir /data/dl1/
+--date 20240120
+--output-dir ./
+--dl3-index-dir /data/dl3/
+
+"""
+
+import astropy.units as u
+
+import pandas as pd
+import numpy as np
+import glob
+
+from sst1mpipe.io import load_config
+
+from sst1mpipe.io import (
+    load_dl1_sst1m,
+    load_dl2_sst1m,
+    check_outdir
+)
+from sst1mpipe.utils import get_telescopes
+
+from gammapy.data import DataStore
+
+from astropy.io.misc.hdf5 import write_table_hdf5
+from astropy.table import QTable
+
+import argparse
+
+def parse_args():
+
+    parser = argparse.ArgumentParser(description="Export distributions of DL1 intensity rates per obsid (wobble)")
+
+    parser.add_argument(
+                    '--dl1-dir', type=str,
+                    dest='dl1_dir',
+                    help='Directory with DL1 files.',
+                    default='./'
+                    )
+
+    parser.add_argument(
+                    '--date', type=str,
+                    dest='date',
+                    help='Date to be processed.',
+                    default=None
+                    )
+
+    parser.add_argument(
+                    '--output-dir', type=str,
+                    dest='outdir',
+                    help='Path to store the output distributions',
+                    default='./'
+                    )
+
+    parser.add_argument(
+                    '--dl3-index-dir', type=str,
+                    dest='dl3_indexes',
+                    help='Directory with DL3 indexes.',
+                    default=''
+                    )
+
+    args = parser.parse_args()
+    return args
+
+    
+def main():
+
+    args = parse_args()
+
+    outpath = args.outdir
+    datastore = args.dl3_indexes
+    data_path_dl1 = args.dl1_dir
+    date = args.date
+
+    bins=np.logspace(1, 5, 500)
+    bins_width = bins[1:] - bins[:-1]
+
+    # get dl3
+    data_store = DataStore.from_dir(datastore)
+    data_store.obs_table.sort('TSTART')
+
+    # get all obsids (wobbles) for given date
+    obsids = np.array(data_store.obs_table['OBS_ID']).astype(str)
+    obsids_date = [i for i in obsids if date in i]
+
+    # load all DL1 for given date
+    files = glob.glob(data_path_dl1 + '/*_stereo.h5')
+    logs = glob.glob(data_path_dl1 + "/*.log")
+    if len(files) == 0:
+        files = glob.glob(data_path_dl1 + '/*dl1.h5')
+    if len(files) == 0:
+        files = glob.glob(data_path_dl1 + '/*dl1_recleaned.h5')
+    files.sort()
+    
+    # Sometimes first few files are broken
+    for file in files:
+        tels = get_telescopes(file)
+        if len(tels)> 0:
+            break
+
+    tel = tels[0]
+    dl1_data, ped_fractions, recleaned_fractions, times = load_data(files, logs, config=None, tel=tel, data_level='dl1')
+
+    # iterate over obsids for given date and split data
+    for obsid in obsids_date:
+        
+        row_mask = obsids == obsid
+        tmin = data_store.obs_table[row_mask]['TSTART']
+        tmax = data_store.obs_table[row_mask]['TSTOP']
+        
+        time_mask = (dl1_data['local_time'] > tmin.value[0]) & (dl1_data['local_time'] <= tmax.value[0])
+        time_mask_ped = (times > tmin.value[0]) & (times <= tmax.value[0])
+    
+        # get intensity distribution per obsid (wobble)
+        
+        data, bin_edges = np.histogram(dl1_data[time_mask].camera_frame_hillas_intensity, bins=bins)
+        zenith = 90.-np.mean(dl1_data[time_mask].true_alt_tel)
+        
+        # elapsed time: sum of the time differences, excluding large ones
+        time_diff = dl1_data[time_mask].local_time.diff()
+        t_elapsed = np.sum(time_diff[time_diff < 10.]) * u.s
+        timestamp = np.mean(dl1_data[time_mask].local_time)
+
+        ped_fraction_mean = np.mean(ped_fractions[time_mask_ped])
+        recleaned_fraction_mean = np.mean(recleaned_fractions[time_mask_ped])
+    
+        rate = data / t_elapsed
+        differential_rate = rate / bins_width
+
+        print('Integration time for obsid {}: {}'.format(obsid, t_elapsed.to(u.hour)))
+
+        t_table = QTable()
+        t_table['t_elapsed'] = np.array([t_elapsed.to(u.hour).value])
+        z_table = QTable()
+        z_table['zenith'] = np.array([zenith])
+        tt_table = QTable()
+        tt_table['timestamp'] = np.array([timestamp])
+        ped_table = QTable()
+        ped_table['survived_pedestal_frac'] = np.array([ped_fraction_mean])
+        rec_table = QTable()
+        rec_table['recleaned_fraction'] = np.array([recleaned_fraction_mean])
+
+        # Save all to output tables
+        table = get_table(rate, differential_rate, bin_edges=bin_edges)
+
+        check_outdir(outpath)
+        outfile = outpath + '/intensity_hist_'+str(int(obsid))+'.h5'
+        write_table_hdf5(table, outfile, path='intensity_hist', overwrite=True, append=True, serialize_meta=True)
+        write_table_hdf5(t_table, outfile, path='t_elapsed', overwrite=True, append=True, serialize_meta=True)
+        write_table_hdf5(z_table, outfile, path='zenith', overwrite=True, append=True, serialize_meta=True)
+        write_table_hdf5(tt_table, outfile, path='timestamp', overwrite=True, append=True, serialize_meta=True)
+        write_table_hdf5(ped_table, outfile, path='survived_pedestal_frac', overwrite=True, append=True, serialize_meta=True)
+        write_table_hdf5(rec_table, outfile, path='recleaned_fraction', overwrite=True, append=True, serialize_meta=True)
+
+def get_table(rate, diff_rate, bin_edges=None):
+
+    table = QTable()
+    table["low"] = bin_edges[:-1]
+    table["high"] = bin_edges[1:]
+    table["center"] = (bin_edges[:-1] + bin_edges[1:]) / 2
+    table["rate"] = rate
+    table["diff_rate"] = diff_rate
+
+    return table
+
+def load_data(files, logs, config=None, tel=None, data_level='dl1'):
+    i = 0
+    data = None
+    ped_fractions = []
+    recleaned_fractions = []
+    times = []
+    
+    for input_file in files:
+        try:
+            if data_level == 'dl1':
+                df = load_dl1_sst1m(input_file, tel=tel, config=config, table='pandas')
+                times.append(df['local_time'][0])
+
+                # find log 
+                date = input_file.split('/')[-1].split('.')[0].split('_')[1]
+                run = input_file.split('/')[-1].split('.')[0].split('_')[2]
+                res = [i for i in logs if date in i]
+                log_file = [i for i in res if run in i][0]
+
+                # find fraction of pedestals in log
+                ped = 'Fraction of pedestal'
+                reclean = 'raised picture threshold'
+                with open(log_file, 'r') as fp:
+                    # read all lines in a list
+                    lines = fp.readlines()
+                    ped_fraction = 100
+                    recleaned_fraction = 0
+                    for line in lines:
+                        # check if string present on a current line
+                        if line.find(ped) != -1:
+                            ped_fraction = float(line.split(': ')[-1])
+                        if line.find(reclean) != -1:
+                            recleaned_fraction = float(line.split(': ')[-1])
+                    ped_fractions.append(ped_fraction)
+                    recleaned_fractions.append(recleaned_fraction)
+
+            elif data_level == 'dl2':
+                df = load_dl2_sst1m(input_file, tel=tel, config=config, table='pandas')
+        except:
+            print('Broken file: ' + input_file + ', skipping.')
+            continue
+        if i == 0:
+            data = df
+            i += 1
+        else:
+            data = pd.concat([data, df])
+
+    ped_fractions = np.array(ped_fractions)
+    recleaned_fractions = np.array(recleaned_fractions)
+    times = np.array(times)
+    return data, ped_fractions, recleaned_fractions, times
+
+if __name__ == '__main__':
+    main()
+
+

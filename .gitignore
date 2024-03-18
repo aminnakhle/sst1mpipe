@@ -1,0 +1,7 @@
+**/__pycache__
+**/.ipynb_checkpoints
+*.egg
+*.eggs
+*.egg-info
+build
+ctapipe-merge.provenance.log
