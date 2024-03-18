@@ -1,6 +1,6 @@
 # SST-1M pipeline
 
-The [sst1mpipe](https://github.com/SST-1M-collaboration/sst1mpipe) repository serves for data processing and  analysis of the <b>SST-1M prototype</b>. There are currently two SST-1M telescopes installed in Ondrejov, Czech Republic, working in mono and stereo regime of observations. It based on [ctapipe](https://github.com/cta-observatory/ctapipe) and inspired by [cta-lstchain](https://github.com/cta-observatory/cta-lstchain). Some funcionalities for stereoscopic reconstruction are inspired by [magic-cta-pipe](https://github.com/cta-observatory/magic-cta-pipe).
+The [sst1mpipe](https://github.com/SST-1M-collaboration/sst1mpipe) repository is used for processing and analyzing data from the <b>SST-1M</b> prototype. Currently, two SST-1M telescopes are installed in Ondrejov, Czech Republic, operation in both mono and stereo observation modes. The <b>SST-1M</b> pipeline is based on [ctapipe](https://github.com/cta-observatory/ctapipe) and draws inspiration from [cta-lstchain](https://github.com/cta-observatory/cta-lstchain). Some funcionalities for stereoscopic reconstruction are inspired by [magic-cta-pipe](https://github.com/cta-observatory/magic-cta-pipe).
 
 **NOTE ON OLD RELEASES**
 
