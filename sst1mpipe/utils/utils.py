@@ -215,6 +215,27 @@ def event_hillas_add_units(event):
 
 
 def add_trigger_time(event, telescope=None):
+    """
+    Stores local_camera_clock provided with event source
+    in event.trigger with nanosecond precision, see
+    https://github.com/cta-observatory/ctapipe_io_nectarcam/issues/24
+    Note: If we read the data using ctapipe.io.read_table, 
+    the numerical precision is lost anyway. This is the reason
+    storing WR timestamps in two columns directly in the DL1
+    table.
+
+    Parameters
+    ----------
+    event:
+        sst1mpipe.io.containers.SST1MArrayEventContainer
+    telescope: int
+
+    Returns
+    -------
+    event:
+        sst1mpipe.io.containers.SST1MArrayEventContainer
+
+    """
 
     localtime = event.sst1m.r0.tel[telescope].local_camera_clock.astype(np.uint64)
     # assuming local_camera_clock in gps (gps = tai - 19s), gps scale does not exist in astropy
@@ -241,6 +262,25 @@ def add_trigger_time(event, telescope=None):
 
 
 def add_event_id(event, filename=None, event_number=0):
+    """
+    Fills event container with event_id if missing.
+    This invented event_id is based on date, run id
+    and event number within the file. First two of
+    those are extracted from the filename.
+
+    Parameters
+    ----------
+    event:
+        sst1mpipe.io.containers.SST1MArrayEventContainer
+    filename: string
+    event_number: int
+
+    Returns
+    -------
+    event:
+        sst1mpipe.io.containers.SST1MArrayEventContainer
+
+    """
 
     date = filename.split('/')[-1].split('_')[1]
     obs_id = date + filename.split('/')[-1].split('_')[2]
@@ -257,7 +297,30 @@ def add_event_id(event, filename=None, event_number=0):
     return event
 
 
-def add_pointing_to_events(event, ra=None, dec=None, telescope=None, location=None):
+def add_pointing_to_events(
+    event, ra=None, dec=None, 
+    telescope=None, location=None):
+    """
+    Fills array pointing and telescope pointing 
+    fields of the event container. Pointing 
+    altitude ant azimuth are also calculated 
+    from poiting ra,dec and trigger time.
+
+    Parameters
+    ----------
+    event:
+        sst1mpipe.io.containers.SST1MArrayEventContainer
+    ra: float
+    dec: float
+    telescope: int
+    location: astropy.coordinates.EarthLocation
+
+    Returns
+    -------
+    event:
+        sst1mpipe.io.containers.SST1MArrayEventContainer
+
+    """
 
     wobble_coords = SkyCoord(ra=float(ra) * u.deg, dec=float(dec) * u.deg, frame='icrs')
     horizon_frame = AltAz(obstime=event.trigger.time, location=location)
@@ -272,6 +335,21 @@ def add_pointing_to_events(event, ra=None, dec=None, telescope=None, location=No
 
 
 def check_mc(file):
+    """
+    Checks the input DL1 HDF file and
+    returns True of False if it's 
+    MC or data file, respectively.
+
+    Parameters
+    ----------
+    file: string
+        Input DL1 file.
+
+    Returns
+    -------
+    bool
+
+    """
 
     try:
         mc = read_table(file, "/configuration/simulation/run")
@@ -295,7 +373,36 @@ def get_avg_pointing(dl1):
     return tel_ze, tel_az
 
 
-def get_closest_rf_model(dl1, models_dir=None, nsb_level=None, tel=None, config=None):
+def get_closest_rf_model(
+        dl1, models_dir=None, nsb_level=None, 
+        tel=None, config=None):
+    """
+    RF models are trained per bin in zenith angle,
+    azimuth and NSB level. They are expected to be
+    stored in subdirectories with the following 
+    naming format: \'zeXX_azXX_nsbXX\'. This provides
+    the path to the closest RF models (in [NSB,ze,az]
+    space).
+
+    Parameters
+    ----------
+    dl1: pandas.DataFrame or astropy.table.Table
+    models_dir: str
+        Path to stored trained RFs, or path to general 
+        production directory where subdirectories with 
+        models in the following naming format are 
+        expected: \'zeXX_azXX_nsbXX\''
+    nsb_level: float
+        Average NSB level, usualy stored in meanQ
+        column of the DL1 table
+    tel: string
+    config: dict
+
+    Returns
+    -------
+    string
+
+    """
 
     dir_content = os.listdir(models_dir)
     if len([i for i in dir_content if '.sav' in i]) == 0:
@@ -529,6 +636,7 @@ def energy_min_cut(file, config=None):
         masked_params.write(file, path='/dl1/event/telescope/parameters/'+tel, overwrite=True, append=True) #, serialize_meta=True)
         if images_tab:
             masked_images.write(file, path='/dl1/event/telescope/images/'+tel, overwrite=True, append=True) #, serialize_meta=True)
+
 
 def remove_stereo(features):
     if "HillasReconstructor_tel_impact_distance" in features:
@@ -967,6 +1075,22 @@ def get_finite(data, config=None, stereo=False):
 
 
 def get_telescopes(input_file, data_level="dl1"):
+    """
+    Returns list of telescopes which have parameters
+    table stored in the input DL1 or DL2 HDF file. 
+
+    Parameters
+    ----------
+    input_file: string
+        Input DL1 or DL2 file.
+    data_level: string
+
+    Returns
+    -------
+    list of strings
+        List of telescopes in the file.
+
+    """
 
     path=data_level+'/event/telescope/parameters'
 
@@ -1015,17 +1139,13 @@ def get_event_pos_in_camera(data, horizon_frame, true_pos=True):
 def camera_to_altaz(pos_x, pos_y, focal, pointing_alt, pointing_az, config=None, telescope=None, times=None):
 
     horizon_frame = get_horizon_frame(config=config, telescope=telescope, times=times)
-
     pointing_direction = SkyCoord(
         alt=clip_alt(pointing_alt), az=pointing_az, frame=horizon_frame
     )
-
     camera_frame = CameraFrame(
         focal_length=focal, telescope_pointing=pointing_direction
     )
-
     camera_coord = SkyCoord(pos_x, pos_y, frame=camera_frame)
-
     horizon = camera_coord.transform_to(horizon_frame)
 
     return horizon

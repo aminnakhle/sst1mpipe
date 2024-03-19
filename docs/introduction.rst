@@ -61,3 +61,8 @@ For developers
     conda env create -f sst1mpipe/environment.yml
     conda activate sst1m-dev
     pip install -e sst1mpipe
+
+
+Analysis basics
+===============
+
