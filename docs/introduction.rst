@@ -63,6 +63,18 @@ For developers
     pip install -e sst1mpipe
 
 
+Setup pre-installed conda environment on **Calculus**
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If one prefers to work on **Calculus**, he/she may skip the pipeline installation completely and 
+only activate preinstalled environment: 
+
+.. code-block:: console
+
+    source /data/work/analysis/software/mambaforge/etc/profile.d/conda.sh
+    conda activate /data/work/analysis/software/mambaforge/envs/sst1m-$SST1MPIPE_VER
+
+
 Analysis basics
 ===============
 
