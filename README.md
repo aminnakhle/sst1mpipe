@@ -2,6 +2,12 @@
 
 The [sst1mpipe](https://github.com/SST-1M-collaboration/sst1mpipe) repository is used for processing and analyzing data from the <b>SST-1M</b> prototype. Currently, two SST-1M telescopes are installed in Ondrejov, Czech Republic, operation in both mono and stereo observation modes. The <b>SST-1M</b> pipeline is based on [ctapipe](https://github.com/cta-observatory/ctapipe) and draws inspiration from [cta-lstchain](https://github.com/cta-observatory/cta-lstchain). Some funcionalities for stereoscopic reconstruction are inspired by [magic-cta-pipe](https://github.com/cta-observatory/magic-cta-pipe).
 
+sst1mpipe provides tools for low-level data analysis up to DL3, which can be further analyzed using standard tools such as [gammapy](https://github.com/gammapy).
+
+- **Source code:** https://https://github.com/SST-1M-collaboration/sst1mpipe
+- **Documentation:** https://sst1mpipe.readthedocs.io/
+
+
 **NOTE ON OLD RELEASES**
 
 v0.3.5 of *sst1mpipe* was the last one before the repository was made public. Old releases are available only to the members of SST-1M Consortium and can be found in a privare repository [sst1mpipe-old](https://github.com/SST-1M-collaboration/sst1mpipe-old).
