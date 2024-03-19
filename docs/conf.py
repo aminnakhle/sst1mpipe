@@ -22,7 +22,8 @@ extensions = [
     "sphinx.ext.intersphinx",
     'sphinx.ext.githubpages', 
     "numpydoc",
-    "sphinx_rtd_theme"
+    "sphinx_rtd_theme",
+    "sphinx_togglebutton"
 ]
 
 templates_path = ['_templates']
