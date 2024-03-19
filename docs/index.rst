@@ -3,22 +3,20 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-.. _sst1mpipe:
+Welcome to sst1mpipe's documentation!
+=====================================
 
-========================================================
- Repository for SST-1M analysis software (``sst1mpipe``)
-========================================================
+.. note::
 
-.. currentmodule:: sst1mpipe
+   This project is under active development.
 
-**version**:  |version|
+.. include:: ../README.md
 
-.. _sst1mpipe_overview:
+Contents
+--------
 
 .. toctree::
    :maxdepth: 1
-   :caption: Overview
-   :name: _sst1mpipe_overview
-
+   Home <self>
    introduction
    sst1m_analysis_workflow
