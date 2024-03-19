@@ -22,11 +22,6 @@ extensions = [
     "sphinx.ext.intersphinx",
     'sphinx.ext.githubpages', 
     "numpydoc",
-    "nbsphinx",
-    "sphinx_automodapi.automodapi",
-    "sphinxarg.ext",
-    "sphinxcontrib.mermaid",
-    "sphinx_togglebutton",
     "sphinx_rtd_theme"
 ]
 

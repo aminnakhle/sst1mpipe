@@ -15,6 +15,7 @@ dependencies:
   - sphinx-automodapi
   - sphinx-design
   - sphinx_rtd_theme
+  - numpydoc
   - pip:
       - ctaplot~=0.6.2
       - pyirf~=0.8.0
