@@ -10,9 +10,12 @@ Welcome to sst1mpipe's documentation!
 
    This project is under active development.
 
-The **sst1mpipe** repository is used for processing and analyzing data from the SST-1M prototype. Currently, two SST-1M telescopes are installed in Ondrejov, Czech Republic, operation in both mono and stereo observation modes.
+The **sst1mpipe** repository is used for processing and analyzing data from 
+the SST-1M prototype. Currently, two SST-1M telescopes are installed in Ondrejov, 
+Czech Republic, operation in both mono and stereo observation modes.
 
-**sst1mpipe** provides tools for low-level data analysis up to DL3, which can be further analyzed using standard tools such as `gammapy <https://github.com/gammapy>`_.
+**sst1mpipe** provides tools for low-level data analysis up to DL3, which can be 
+further analyzed using standard tools such as `gammapy <https://github.com/gammapy>`_.
 
 .. toctree::
    :maxdepth: 1
