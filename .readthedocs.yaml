@@ -11,6 +11,8 @@ python:
       path: .
       extra_requirements:
         - docs
+        - numpydoc
+        - sphinx_rtd_theme
 
 sphinx:
   configuration: docs/conf.py
