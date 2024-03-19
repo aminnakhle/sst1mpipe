@@ -4,7 +4,7 @@ The [sst1mpipe](https://github.com/SST-1M-collaboration/sst1mpipe) repository is
 
 sst1mpipe provides tools for low-level data analysis up to DL3, which can be further analyzed using standard tools such as [gammapy](https://github.com/gammapy).
 
-- **Source code:** https://https://github.com/SST-1M-collaboration/sst1mpipe
+- **Source code:** https://github.com/SST-1M-collaboration/sst1mpipe
 - **Documentation:** https://sst1mpipe.readthedocs.io/
 
 
