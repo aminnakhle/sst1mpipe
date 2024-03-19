@@ -10,13 +10,15 @@ Welcome to sst1mpipe's documentation!
 
    This project is under active development.
 
-.. include:: ../README.md
-
-Contents
---------
+The sst1mpipe repository is used for processing and analyzing data from the SST-1M prototype. Currently, two SST-1M telescopes are installed in Ondrejov, Czech Republic, operation in both mono and stereo observation modes.
 
 .. toctree::
    :maxdepth: 1
-   Home <self>
-   introduction
-   sst1m_analysis_workflow
+   :caption: Contents:
+
+Overview
+========
+
+* :ref:`genindex`
+* :ref:`introduction`
+* :ref:`sst1m_analysis_workflow`
