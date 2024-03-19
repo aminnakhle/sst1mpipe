@@ -6,9 +6,7 @@ Introduction
 Installation
 ------------
 
-The advanced package and environment management system, `Anaconda <https://www.anaconda.com/distribution/#download-section>`, _ 
-`Miniconda <https://docs.conda.io/en/latest/miniconda.html>` or `Mamba <https://anaconda.org/conda-forge/mamba>`, is needed _ 
-to be installed first.
+The advanced package and environment management system, :ref:`Anaconda <https://www.anaconda.com/distribution/#download-section>`, :ref:`Miniconda <https://docs.conda.io/en/latest/miniconda.html>` or :ref:`Mamba <https://anaconda.org/conda-forge/mamba>`, is needed to be installed first.
 
 The Mamba is recomended due to some (quite often occured) stucks at solving environment on Anaconda. Up to now Mamba works well.
 
@@ -19,12 +17,14 @@ Set up environment based on Mamba
     For more details see https://github.com/conda-forge/miniforge#mambaforge
 
 .. code-block:: console
+
     curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Mambaforge-$(uname)-$(uname -m).sh"
     bash Mambaforge-$(uname)-$(uname -m).sh
 
 or
 
 .. code-block:: console
+
     wget "https://github.com/conda-forge/miniforge/releases/latest/download/Mambaforge-$(uname)-$(uname -m).sh"
     bash Mambaforge-$(uname)-$(uname -m).sh
 
@@ -36,6 +36,7 @@ For users
 - install **sst1mpipe**
 
 .. code-block:: console
+
     SST1MPIPE_VER=0.4.0
 
     wget https://raw.githubusercontent.com/SST-1M-collaboration/sst1mpipe/v$SST1MPIPE_VER/environment.yml
@@ -55,6 +56,7 @@ For developers
 - install **sst1mpipe**
 
 .. code-block:: console
+    
     git clone git@github.com:SST-1M-collaboration/sst1mpipe.git
     conda env create -f sst1mpipe/environment.yml
     conda activate sst1m-dev
