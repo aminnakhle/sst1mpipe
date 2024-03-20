@@ -76,6 +76,6 @@ only activate preinstalled environment:
 
 
 Analysis basics
-===============
+---------------
 
 TBD
