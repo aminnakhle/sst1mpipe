@@ -80,3 +80,45 @@ Default config file for data:
 R0 to DL1
 ~~~~~~~~~
 
+To calibrate raw data (R0) or MC (R1) and process them to DL1, one may run script ``sst1mpipe_r0_dl1``. Inputs are a single raw 
+.fits.fz data file (containing single telescope data) or .simtel.gz output file of sim_telarray (may contain more telescopes).
+Output is HDF5 file with a table of DL1 parameters, one outputfile per observing run and per telescope (DL1 files from individual 
+telescopes are merged for stereoscopic reconstruction in the next step :ref:`dl1_dl1_stereo`).
+
+It applies dc to p.e. calibration on raw R0 waveforms, integrate them, clean the images (get rid of the noisy pixels which do not 
+contain any Cherenkov photons), and parametrize the shower images with Hillas ellipses. All this can be done by running 
+See ‘--help’ for possible inputs. Some of them, which might not be obvious:
+
+* ``--px-charges`` - the script stores also distribution of all integrated charges in individual pixels for all events merged. 
+This is good for further MC/data tunning and to get some impression on the level of NSB in the data.
+
+* ``--precise-timestamps`` - stores also White Rabbit timestamps in the DL1 output with the precision needed for matching matching of 
+coincident events. Keep it on for all data taken after 25th September 2023.
+
+* ``--pointing-ra/dec`` and ``--force-pointing`` - allows to specify the telescope pointing direction. In all data taken 
+from begining of September 2023 it can be ignored (i.e. do not use it for any new data), because the pointing coordinates 
+are being written automaticaly in the fits file header during the datataking and the script understands where to look for it.
+
+* ``—-reclean`` - experimental method of data re-cleaning based on pixel charge variation. For now it needs distribution of pixel 
+charges stored in the first pass of the script. I.e. to apply re-cleaning, one has to run the script for the second time having this 
+switch activa.
+
+Relevant parts of the config file applied in this analysis step:
+* ``telescope_calibration`` - calibration files based on dark run analysis. Should be taken relatively close to the data of observation
+* ``window_transmittance`` - files with for camera window transmittance correction (measured in the lab and can be kept default)
+* ``CameraCalibrator`` - Pulse integration settings
+* ``ImageProcessor`` - Settings of image cleaning method, tailcuts and NSB bins with different tailcuts
+* ``ShowerProcessor`` - Shower geometry reconstruction. Only applied if event source contains data from more telescopes, i.e. it's only relevant
+for MC processing in this analysis step.
+
+
+.. _dl1_dl1_stereo:
+
+DL1 to DL1 stereo
+~~~~~~~~~~~~~~~~~
+
+For stereo reconstruction, we need to find coincident events in tel2 data to each tel1 event. As of now, for each tel1 DL1 file, 
+we basicaly search in the events taken with Tel2 to find the closest one, resulting in a new DL1 file containing events from both 
+telescopes, matched by their event_id.
+
+
