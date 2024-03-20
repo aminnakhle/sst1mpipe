@@ -3,6 +3,8 @@
 SST-1M analysis workflow
 ========================
 
+.. _automatic_processing:
+
 Automatic data processing
 -------------------------
 
@@ -110,6 +112,19 @@ See ``--help`` for possible inputs. Some of them, which might not be obvious:
 * ``ShowerProcessor`` - Shower geometry reconstruction. Only applied if event source contains data from more telescopes, i.e. it's only relevant for MC processing in this analysis step.
 
 
+Random Forest training
+~~~~~~~~~~~~~~~~~~~~~~
+
+.. note::
+
+    In most of the cases analyser does not need to train dedicated Random Forest models and this step can be safely skipped using pre-trained RFs 
+    referenced in :ref:`dl1_dl2`. Training of dedicated RFs is, hovewer, necessary in some performance studies of if one wants to use different 
+    configuration for ``sst1mpipe_r0_dl1`` than MC was processed with.
+
+TBD
+
+
+
 .. _dl1_dl1_stereo:
 
 DL1 to DL1 stereo
@@ -131,9 +146,11 @@ options are:
 
 .. note::
 
-    This is **not intended to be run on MC**, as in MC DL1 we already have coincident events matched by their ``event_id`` (mono events are in the DL1 
+    ``sst1mpipe_data_dl1_dl1_stereo`` is **not intended to be run on MC**, as in MC DL1 we already have coincident events matched by their ``event_id`` (mono events are in the DL1 
     tables as well, so those can be used for both mono and stereo analysis).
 
+
+.. _dl1_dl2:
 
 DL1 to DL2
 ~~~~~~~~~~
@@ -161,6 +178,18 @@ reconstruction and different zenith angles:
 * ``stereo_reco_weights`` - Parameter used as a weight for averaging of stereo reconstructed parameters.
 
 
+DL2 MC to IRFs
+~~~~~~~~~~~~~~
+
+.. note::
+
+    In most of the cases analyser does not need to produce own Instrument Response Functions and this step can be safely skipped using IRFs referenced in 
+    :ref:`automatic_processing`. IRF production, however, is necessary in performance studies, or is one use custom RFs to produce DL2, or applies
+    custom selection cuts in DL2 to DL3 step.
+
+TBD
+
 DL2 to DL3
 ~~~~~~~~~~
 
+TBD
