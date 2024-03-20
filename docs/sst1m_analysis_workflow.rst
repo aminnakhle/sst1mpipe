@@ -206,10 +206,61 @@ DL2 MC to IRFs
     :ref:`automatic_processing`. IRF production, however, is necessary in performance studies, or is one use custom RFs to produce DL2, or applies
     custom selection cuts in DL2 to DL3 step.
 
-TBD
+To make IRFs from MC DL2 files, one can run ``sst1mpipe_mc_make_irfs``, which currently produce only full enclosure IRFs, so it has to be provided with 
+diffuse protons and gammas. The script applies event selection cuts defined in the config file (``event_selection``), including cut on gammaness. 
+The gammaness cut can be either global (one number independent on energy) or energy dependent (expected performance improvement as gammaness 
+distribution depends on energy). Global gammaness cut can be set in the config file (``global_gammaness_cut`` field), while energy dependent
+cuts, must be provided as path a to the HDF5 table, where the cuts for individual energy bins are stored, using parameter 
+``--gammaness-cut-dir``. These can be generated with ``sst1mpipe_mc_performance`` (see :ref:`performance`). Pre-calculated energy dependent gammaness 
+cuts are stored on Calculus for mono/stereo and different zenith angles:
 
+``/data/work/analysis/MC/prod_january_2023/$SST1MPIPE_VER/performance/*_performance_*``
+
+Again, one should make sure that the event selection applied to produce the cuts is the same as in the cfg file for IRF. The IRF maker creates 
+some directory structure inside the ``--output-dir``, automaticaly recognizing proper bin in zenith, azimuth, NSB level and gammaness cut applied. 
+This directory structure should remain untouched for :ref:`dl2_dl3` to work properly.
+
+Output IRF files are fully compatible with gammapy and may be read and explored with the use of gammapy funkcionalities:
+
+.. code-block:: console
+
+    from gammapy.irf import (
+        EffectiveAreaTable2D,
+        PSF3D,
+        EnergyDispersion2D
+        Background2D
+    )
+    irf_filename = 'SST1M_tel_021_Zen30deg_gcut0.75_irfs.fits'
+    aeff = EffectiveAreaTable2D.read(irf_filename, hdu="EFFECTIVE AREA")
+    edisp = EnergyDispersion2D.read(irf_filename, hdu="ENERGY DISPERSION")
+    psf = PSF3D.read(irf_filename, hdu='POINT SPREAD FUNCTION')
+    bg_2d = Background2D.read(irf_filename, hdu='BACKGROUND')
+
+
+.. _dl2_dl3:
 
 DL2 to DL3
 ~~~~~~~~~~
+
+``sst1mpipe_data_dl2_dl3`` is a tool to create DL3 data files from DL2 data files. It is supposed to be provided with a directory with input DL2 files 
+(typicaly a directory with DL2 files for one source observed in one night, but can be run on larger sample as well). It merges the DL2 ``HDF5`` per-run 
+files into per-wobble DL3 ``fits`` files. It also finds proper IRF based on zenith, azimuth and NSB level of each input DL2 file. It also creates 
+per-night index files needded for further analysis in gammapy. The script applies event selection cuts defined in the config file (``event_selection``), 
+including cut on gammaness, so **one should make sure that these are the same as used on MC to produce IRFs**.
+
+Output DL3 files are fully compatible with gammapy and may be further analyzed using gammapy tools. See e.g. 
+
+* `Tutorial on 1D spectral analysis <https://docs.gammapy.org/1.2/tutorials/analysis-1d/spectral_analysis.html>`_
+
+* `Tutorial on 2D ring background map <https://docs.gammapy.org/1.2/tutorials/analysis-2d/ring_background.html>`_
+
+A typical use case is to run joint gammapy analysis on data from several nights. In such case one has to use ``create_hdu_indexes`` script to create 
+HDU index files indexing all DL3s to be used in the final analysis.
+
+
+.. _performance:
+
+RF performance and sensitivity
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 TBD
