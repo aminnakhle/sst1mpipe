@@ -117,12 +117,31 @@ Random Forest training
 
 .. note::
 
-    In most of the cases analyser does not need to train dedicated Random Forest models and this step can be safely skipped using pre-trained RFs 
+    In most cases **analyser does not need to train dedicated Random Forest models and this step can be safely skipped** using pre-trained RFs 
     referenced in :ref:`dl1_dl2`. Training of dedicated RFs is, hovewer, necessary in some performance studies of if one wants to use different 
     configuration for ``sst1mpipe_r0_dl1`` than MC was processed with.
 
-TBD
+Random Forests can be trained on **DL1 MC diffuse gammas and diffuse proton** files using ``sst1mpipe_mc_train_rfs`` script (see 
+``--help`` for possible inputs). Before running ``sst1mpipe_mc_train_rfs`` it is useful to merge many small DL1 MC files resulting 
+from paralelized MC simulations into a single file per particle with ``sst1mpipe_merge_hdf5`` script to reach satisfactory 
+statistics for RF training. Outputs are trained models in ``scikit.learn`` format (.sav). There is RF classifier for gamma/hadron
+separation, RF regressor for energy reconstruction, and either RF regressor (``disp_vector``) or RF regressor+classifier (``disp_norm_sign``) 
+for arrival direction reconstruction depenting on the method selected.
 
+RF are trained for each telescope, even in case of stereo reconstruction. In stereo, we only use extra stereo features, 
+which are reconstructed geometricaly, such as ``HillasReconstructor_h_max`` and ``HillasReconstructor_tel_impact_distance``. 
+Then, in :ref:`dl1_dl2`, reconstruction is done for each telescope independently, and final reconstructed quantities are 
+obtained as weighted average of the values for each telescope.
+
+**Relevant parts of the config file** applied in this analysis step:
+
+* Setup of the forests and training procedure ``random_forest_regressor_args``, ``random_forest_classifier_args``
+
+* Random Forest features used for the reconstruction - ``energy_regression_features``, ``disp_regression_features``, ``disp_classification_features``, ``particle_classification_features``. The very featuresused for RF training have to be used later in :ref:`dl1_dl2` reconstruction 
+
+* ``n_training_events`` - Total number of events used for individual RF training. I.e. if ``n_training_events=200000``, 200k diffuse gammas are used for energy regressor and DISP regressor and classifier, and 100k diffuse gammas + 100k diffuse protons is used for particle classifier (if ``gamma_to_proton_training_ratio=1``).
+
+* ``gamma_to_proton_training_ratio`` - Ratio of gammas and protons in training sample for particle classifier.
 
 
 .. _dl1_dl1_stereo:
@@ -183,11 +202,12 @@ DL2 MC to IRFs
 
 .. note::
 
-    In most of the cases analyser does not need to produce own Instrument Response Functions and this step can be safely skipped using IRFs referenced in 
+    In most cases **analyser does not need to produce own Instrument Response Functions and this step can be safely skipped** using IRFs referenced in 
     :ref:`automatic_processing`. IRF production, however, is necessary in performance studies, or is one use custom RFs to produce DL2, or applies
     custom selection cuts in DL2 to DL3 step.
 
 TBD
+
 
 DL2 to DL3
 ~~~~~~~~~~
