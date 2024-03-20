@@ -63,8 +63,8 @@ For developers
     pip install -e sst1mpipe
 
 
-Setup pre-installed conda environment on **Calculus**
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Pre-installed conda environment on **Calculus**
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 If one prefers to work on **Calculus**, he/she may skip the pipeline installation completely and 
 only activate preinstalled environment: 

@@ -87,7 +87,7 @@ telescopes are merged for stereoscopic reconstruction in the next step :ref:`dl1
 
 It applies dc to p.e. calibration on raw R0 waveforms, integrate them, clean the images (get rid of the noisy pixels which do not 
 contain any Cherenkov photons), and parametrize the shower images with Hillas ellipses. All this can be done by running 
-See ‘--help’ for possible inputs. Some of them, which might not be obvious:
+See ``--help`` for possible inputs. Some of them, which might not be obvious:
 
 * ``--px-charges`` - the script stores also distribution of all integrated charges in individual pixels for all events merged. 
 This is good for further MC/data tunning and to get some impression on the level of NSB in the data.
@@ -103,11 +103,16 @@ are being written automaticaly in the fits file header during the datataking and
 charges stored in the first pass of the script. I.e. to apply re-cleaning, one has to run the script for the second time having this 
 switch activa.
 
-Relevant parts of the config file applied in this analysis step:
+**Relevant parts of the config file** applied in this analysis step:
+
 * ``telescope_calibration`` - calibration files based on dark run analysis. Should be taken relatively close to the data of observation
+
 * ``window_transmittance`` - files with for camera window transmittance correction (measured in the lab and can be kept default)
+
 * ``CameraCalibrator`` - Pulse integration settings
+
 * ``ImageProcessor`` - Settings of image cleaning method, tailcuts and NSB bins with different tailcuts
+
 * ``ShowerProcessor`` - Shower geometry reconstruction. Only applied if event source contains data from more telescopes, i.e. it's only relevant
 for MC processing in this analysis step.
 
@@ -117,8 +122,60 @@ for MC processing in this analysis step.
 DL1 to DL1 stereo
 ~~~~~~~~~~~~~~~~~
 
-For stereo reconstruction, we need to find coincident events in tel2 data to each tel1 event. As of now, for each tel1 DL1 file, 
-we basicaly search in the events taken with Tel2 to find the closest one, resulting in a new DL1 file containing events from both 
-telescopes, matched by their event_id.
+For stereo reconstruction, we need to find coincident events in tel2 DL1 data to each tel1 DL1 event. As of now, for each tel1 DL1 file, 
+we search in the events taken with Tel2 to find the closest one, resulting in a new DL1 file containing events from both 
+telescopes, matched by their event_id (only coincident events are stored in resulting DL1 files). 
 
+This is performed by script ``sst1mpipe_data_dl1_dl1_stereo`` (see ``--help`` for possible inputs.). Input is a single DL1 file from tel1 
+and a directory with all relevant DL1 files for tel2. Coincidence finder is driven by **the config file** field ``stereo``. Possible 
+options are:
+
+* ``SlidingWindow`` - For analysis of the data without precise White Rabbit timestamps (i.e. taken until 25th September 2023)
+ one needs to use this method, which first finds the time time offset between the two tables providing maximum number of coindicent events 
+ and then selects the closest ones.
+
+* ``WhiteRabbitClosest`` - Works on data with precise WR timestamps in the DL1 table, i.e. all data taken after 25th September 2023. It only finds the 
+closest tel2 event to each tel1 event (precision of WR is high enough to avoid random coincidences for usual trigger rates of the telescopes).
+
+* ``SWATEventIDs`` - After 30th January 2024 the coincident events are tagged by SWAT, providing them with the same ``arrayEvtNum``, resulting in the 
+same ``event_id`` in the DL1 files. The DL1 mono events can be then matched just based on the ``event_id``.
+
+.. note::
+
+    This is **not intended to be run on MC**, as in MC DL1 we already have coincident events matched by their ``event_id`` (mono events are in the DL1 
+    tables as well, so those can be used for both mono and stereo analysis).
+
+
+DL1 to DL2
+~~~~~~~~~~
+
+This step uses pre-trained Random Forests to reconstruct shower parameters (gammaness, direction and energy) using Hillas parameters stored in 
+DL1 files as features. One can run ``sst1mpipe_data_dl1_dl2`` on either mono DL1 files (outputs of ``sst1mpipe_r0_dl1``) for each telescope separately (using RFs for mono reconstruction), 
+or on stereo DL1 containing coincident events only (outputs of ``sst1mpipe_data_dl1_dl1_stereo``). The script can handle both types of DL1, 
+but stereo reconstruction has to be requested using ``-—stereo`` switch. RFs trained on MC can be found on **Calculus** for both mono and stereo 
+reconstruction and different zenith angles:
+
+* ``/data/work/analysis/MC/prod_january_2023/$SST1MPIPE_VER/models_mono_psf_vaod0.2/``
+
+* ``/data/work/analysis/MC/prod_january_2023/$SST1MPIPE_VER/models_stereo_psf_vaod0.2/``
+
+.. note::
+
+    One should always use RF models trained with the same sst1mpipe version that is used for the analysis. 
+
+**Relevant parts of the config file** applied in this analysis step:
+
+* Random Forest features used for the reconstruction - ``energy_regression_features``, ``disp_regression_features``, 
+``disp_classification_features``, ``particle_classification_features``. These should be the very same features which were used for 
+RF training (check cfg files stored in the directories together with the models)
+
+* ``disp_method`` - Direction reconstruction method used. For now we only use ``disp_norm_sign`` which requires RF regressor to 
+reconstruct source distance from a shower Center of Gravity, and RF classifier to determine on which side along the main axis of 
+the Hillas ellipse the source lies.
+
+* ``stereo_reco_weights`` - Parameter used as a weight for averaging of stereo reconstructed parameters.
+
+
+DL2 to DL3
+~~~~~~~~~~
 
