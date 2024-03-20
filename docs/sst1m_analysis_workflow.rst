@@ -89,19 +89,13 @@ It applies dc to p.e. calibration on raw R0 waveforms, integrate them, clean the
 contain any Cherenkov photons), and parametrize the shower images with Hillas ellipses. All this can be done by running 
 See ``--help`` for possible inputs. Some of them, which might not be obvious:
 
-* ``--px-charges`` - the script stores also distribution of all integrated charges in individual pixels for all events merged. 
-This is good for further MC/data tunning and to get some impression on the level of NSB in the data.
+* ``--px-charges`` - the script stores also distribution of all integrated charges in individual pixels for all events merged. This is good for further MC/data tunning and to get some impression on the level of NSB in the data.
 
-* ``--precise-timestamps`` - stores also White Rabbit timestamps in the DL1 output with the precision needed for matching matching of 
-coincident events. Keep it on for all data taken after 25th September 2023.
+* ``--precise-timestamps`` - stores also White Rabbit timestamps in the DL1 output with the precision needed for matching matching of coincident events. Keep it on for all data taken after 25th September 2023.
 
-* ``--pointing-ra/dec`` and ``--force-pointing`` - allows to specify the telescope pointing direction. In all data taken 
-from begining of September 2023 it can be ignored (i.e. do not use it for any new data), because the pointing coordinates 
-are being written automaticaly in the fits file header during the datataking and the script understands where to look for it.
+* ``--pointing-ra/dec`` and ``--force-pointing`` - allows to specify the telescope pointing direction. In all data taken from begining of September 2023 it can be ignored (i.e. do not use it for any new data), because the pointing coordinates are being written automaticaly in the fits file header during the datataking and the script understands where to look for it.
 
-* ``—-reclean`` - experimental method of data re-cleaning based on pixel charge variation. For now it needs distribution of pixel 
-charges stored in the first pass of the script. I.e. to apply re-cleaning, one has to run the script for the second time having this 
-switch activa.
+* ``—-reclean`` - experimental method of data re-cleaning based on pixel charge variation. For now it needs distribution of pixel charges stored in the first pass of the script. I.e. to apply re-cleaning, one has to run the script for the second time having this switch activa.
 
 **Relevant parts of the config file** applied in this analysis step:
 
@@ -113,8 +107,7 @@ switch activa.
 
 * ``ImageProcessor`` - Settings of image cleaning method, tailcuts and NSB bins with different tailcuts
 
-* ``ShowerProcessor`` - Shower geometry reconstruction. Only applied if event source contains data from more telescopes, i.e. it's only relevant
-for MC processing in this analysis step.
+* ``ShowerProcessor`` - Shower geometry reconstruction. Only applied if event source contains data from more telescopes, i.e. it's only relevant for MC processing in this analysis step.
 
 
 .. _dl1_dl1_stereo:
@@ -130,15 +123,11 @@ This is performed by script ``sst1mpipe_data_dl1_dl1_stereo`` (see ``--help`` fo
 and a directory with all relevant DL1 files for tel2. Coincidence finder is driven by **the config file** field ``stereo``. Possible 
 options are:
 
-* ``SlidingWindow`` - For analysis of the data without precise White Rabbit timestamps (i.e. taken until 25th September 2023)
- one needs to use this method, which first finds the time time offset between the two tables providing maximum number of coindicent events 
- and then selects the closest ones.
+* ``SlidingWindow`` - For analysis of the data without precise White Rabbit timestamps (i.e. taken until 25th September 2023) one needs to use this method, which first finds the time time offset between the two tables providing maximum number of coindicent events and then selects the closest ones.
 
-* ``WhiteRabbitClosest`` - Works on data with precise WR timestamps in the DL1 table, i.e. all data taken after 25th September 2023. It only finds the 
-closest tel2 event to each tel1 event (precision of WR is high enough to avoid random coincidences for usual trigger rates of the telescopes).
+* ``WhiteRabbitClosest`` - Works on data with precise WR timestamps in the DL1 table, i.e. all data taken after 25th September 2023. It only finds the closest tel2 event to each tel1 event (precision of WR is high enough to avoid random coincidences for usual trigger rates of the telescopes).
 
-* ``SWATEventIDs`` - After 30th January 2024 the coincident events are tagged by SWAT, providing them with the same ``arrayEvtNum``, resulting in the 
-same ``event_id`` in the DL1 files. The DL1 mono events can be then matched just based on the ``event_id``.
+* ``SWATEventIDs`` - After 30th January 2024 the coincident events are tagged by SWAT, providing them with the same ``arrayEvtNum``, resulting in the same ``event_id`` in the DL1 files. The DL1 mono events can be then matched just based on the ``event_id``.
 
 .. note::
 
@@ -165,13 +154,9 @@ reconstruction and different zenith angles:
 
 **Relevant parts of the config file** applied in this analysis step:
 
-* Random Forest features used for the reconstruction - ``energy_regression_features``, ``disp_regression_features``, 
-``disp_classification_features``, ``particle_classification_features``. These should be the very same features which were used for 
-RF training (check cfg files stored in the directories together with the models)
+* Random Forest features used for the reconstruction - ``energy_regression_features``, ``disp_regression_features``, ``disp_classification_features``, ``particle_classification_features``. These should be the very same features which were used for RF training (check cfg files stored in the directories together with the models)
 
-* ``disp_method`` - Direction reconstruction method used. For now we only use ``disp_norm_sign`` which requires RF regressor to 
-reconstruct source distance from a shower Center of Gravity, and RF classifier to determine on which side along the main axis of 
-the Hillas ellipse the source lies.
+* ``disp_method`` - Direction reconstruction method used. For now we only use ``disp_norm_sign`` which requires RF regressor to reconstruct source distance from a shower Center of Gravity, and RF classifier to determine on which side along the main axis of the Hillas ellipse the source lies.
 
 * ``stereo_reco_weights`` - Parameter used as a weight for averaging of stereo reconstructed parameters.
 
