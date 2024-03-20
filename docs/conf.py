@@ -39,7 +39,7 @@ import sphinx_rtd_theme
 html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
 html_static_path = ['_static']
 
-html_logo = "sst_1m_logo_v06_sst-white-full.svg"
+html_logo = "_static/sst_1m_logo_v06_sst-white-full.svg"
 html_theme_options = {
     'logo_only': True,
     'display_version': True,
