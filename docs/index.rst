@@ -17,6 +17,8 @@ Czech Republic, operation in both mono and stereo observation modes.
 **sst1mpipe** provides tools for low-level data analysis up to DL3, which can be 
 further analyzed using standard tools such as `gammapy <https://github.com/gammapy>`_.
 
+Github `repository <https://github.com/SST-1M-collaboration/sst1mpipe>`_
+
 .. toctree::
    :maxdepth: 1
    :caption: Contents:
