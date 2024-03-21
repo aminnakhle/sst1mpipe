@@ -52,8 +52,8 @@ def get_stereo_method(config):
 
     """
     stereo_method = config['stereo']['event_matching_method']
-    if stereo_method not in ['SlidingWindow', 'WhiteRabbitClosest', 'SWATEeventIDs']:
-        logging.error("Unknown event mathing method set in cfg file! Available options: SlidingWindow, WhiteRabbitClosest, SWATEeventIDs.")
+    if stereo_method not in ['SlidingWindow', 'WhiteRabbitClosest', 'SWATEventIDs']:
+        logging.error("Unknown event mathing method set in cfg file! Available options: SlidingWindow, WhiteRabbitClosest, SWATEventIDs.")
         exit(-1)
     else:
         return stereo_method

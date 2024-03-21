@@ -40,13 +40,13 @@ bash Mambaforge-$(uname)-$(uname -m).sh
 ```
 SST1MPIPE_VER=0.4.0
 
-wget https://raw.githubusercontent.com/SST-1M-collaboration/sst1mpipe/v$SST1MPIPE_VER/environment.yml
-
+wget https://github.com/SST-1M-collaboration/sst1mpipe/archive/refs/tags/v$SST1MPIPE_VER.tar.gz
+tar -xvf v$SST1MPIPE_VER.tar.gz
+cd v$SST1MPIPE_VER
 conda env create -n sst1m-$SST1MPIPE_VER -f environment.yml
 conda activate sst1m-$SST1MPIPE_VER
-pip install sst1mpipe==$SST1MPIPE_VER
+pip install -e .
 
-rm environment.yml
 ```
 
 ### For developers
