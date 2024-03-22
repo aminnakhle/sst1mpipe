@@ -42,7 +42,7 @@ SST1MPIPE_VER=0.4.1
 
 wget https://github.com/SST-1M-collaboration/sst1mpipe/archive/refs/tags/v$SST1MPIPE_VER.tar.gz
 tar -xvf v$SST1MPIPE_VER.tar.gz
-cd v$SST1MPIPE_VER
+cd sst1mpipe-$SST1MPIPE_VER
 conda env create -n sst1m-$SST1MPIPE_VER -f environment.yml
 conda activate sst1m-$SST1MPIPE_VER
 pip install -e .
