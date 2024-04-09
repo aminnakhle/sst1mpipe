@@ -2,19 +2,49 @@
 # -*- coding: utf-8 -*-
 """
 Created on Wed Mar 23 16:36:22 2022
-
 @author: TT 
 
 
 
-This script is ment to produce h5 table containing calibration parameters.
-This is done fitting mes spectrum using dark run data.
+    This script is ment to produce h5 table containing calibration parameters.
+    This is done fitting mes spectrum using dark run data.
+    it need few tens of thousan events (2 raw data file is probably enough)
 
-usage exemple :
-python dark_run_mes_fitter.py --year 2023 --month 2 --day 28 --tel 2 --first_file 129 --n_files 2 --save_plot False --save_dir ./calib
+
+
+    Parameters
+    ----------
+    plot_dir: string
+        Path to a directory to save plots
+    data_path: string
+        Root directory of the raw data ('/net' on calculus)
+    day: int
+        Day of the data you want to use
+    month: int
+        Month of the data you want to use
+    year: int
+        Year of the data you want to use
+
+    first_file: int
+        number of the first file to use
+    tel: int
+        number of the telescope (1 or 2)
+    nfile: int
+        number of file to use starting from first_file 
+    save_dir: string
+        Path to a directory to save h5 files
+    save_plot: boolean
+        Save plots in  plot_dir if True
+    n_proc: int
+        number of core to use if run on a server with multiple proc
+
+    Returns
+    -------
+
+    usage exemple :
+    python dark_run_mes_fitter.py --year 2023 --month 2 --day 28 --tel 2 --first_file 129 --n_files 2 --save_plot False --save_dir ./calib
 
 """
-
 
 import argparse
 from pkg_resources import resource_filename
@@ -46,6 +76,9 @@ from iminuit import Minuit
 
 
 class mes_fitter:
+    """
+    class desinged to produce h5 table containing calibration parameters.
+    """
     def __init__(self,
                  day          = 5,
                  month        = 4,
@@ -58,8 +91,33 @@ class mes_fitter:
                  save_dir     = './calib_h5/',
                  max_evt      = 100000,
                  dark_baselines = None):
-        
-        
+        """"
+        Parameters
+        ----------
+        day: int
+            Day of the data you want to use
+        month: int
+            Month of the data you want to use
+        year: int
+            Year of the data you want to use
+        data_path: string
+            Root directory of the raw data ('/net' on calculus)
+        first_file: int
+            number of the first file to use
+        tel: int
+            number of the telescope (1 or 2)
+        nfile: int
+            number of file to use starting from first_file 
+        plot_dir: string
+            Path to a directory to save plots
+        save_dir: string
+            Path to a directory to save h5 files
+        max_evt: int
+            Max number of event used
+        dark_baselines : 1d array
+            Array of dark baselines value for each pixels. If none digicam baseline will be used
+        """
+
         self.tel        = tel
         self.date_str   = '{:04d}{:02d}{:02d}'.format(year,month,day)
         self.save_dir   = save_dir
@@ -114,6 +172,9 @@ class mes_fitter:
     ##############################################
 
     def get_histograms(self):
+        """
+        read raw files and and load ADC histograms
+        """
         
         n_bins_adcmax = 51
         n_bins_adcsum = 176
@@ -176,6 +237,24 @@ class mes_fitter:
     ##############################################
    
     def spe_spectrum_function(self,x, ll, xt, g, sigma_pe, sigma_el):
+        """
+        single phot-electron spectrum fuction x -> MES(x) 
+
+        Parameters
+        ----------
+        x: integer
+            ADC counts
+        ll: float
+            Expected value of the poisson law (avergae thermal photon number in 60ns)
+        xt : float
+            Cross talk probability
+        g: float
+            gain : Averaged number of ADC counts produced by one photo-electron
+        sigma_pe: float
+            st.d. of the ADC counts produced by one photo-electron
+        sigma_el: float
+            st.d. of the ADC counts produced by the electronic noise
+        """
         
         STP = np.sqrt(2 * np.pi)
         x0 = -ll * g/(1-xt) 
@@ -346,7 +425,7 @@ class mes_fitter:
         self.results = results
         pool.close()
         self.n_failed = (self.res['calib_flag']<1).sum()
-        print('Done!')
+        print('Calibration Done!')
         print('Calibration failed for {}  pixels ({:.3} %)'.format(self.n_failed,self.n_failed/self.n_pixels*100))
         
         return 
