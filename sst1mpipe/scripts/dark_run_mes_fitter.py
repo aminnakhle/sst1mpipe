@@ -77,7 +77,7 @@ from iminuit import Minuit
 
 class mes_fitter:
     """
-    class desinged to produce h5 table containing calibration parameters.
+    class desinged to produce h5 table containing calibration parameters. 
     """
     def __init__(self,
                  day          = 5,
