@@ -15,9 +15,9 @@ from astropy.coordinates import SkyCoord
 import astropy.units as u
 
 '''
- USAGE ::
 this run the analysis pipeline up to stereo dl2 on Calculus.
 USAGE :
+
 nohup python daily_analysis.py /path/to/some/ana_config.json 2>daily_ana.err 1>daily_ana.out &
 
 or 
@@ -31,11 +31,26 @@ python daily_analysis.py 2>daily_ana.err 1>daily_ana.out
 DEFAULT_CONFIG_FILE = '/data/work/analysis/Daily_analysis/default_daily_ana_config.json'
 
 class iargs:
+    """
+    dummy object made to handle arguments to 
+    be passed to the multiprocessing pool.
+    """
     def __init__(self):
         pass
         
 
 def args_maker(arg,file_list):
+    '''
+    Create a list of dummy arg object to be passed to the multiprocessing pool.
+        Parameters
+        ----------
+        arg: class iargs obj.
+            dummy arg object that contain arguments to be
+            padded to sst1mpipe scripts
+
+        file_list: list
+            list of file paths 
+    '''
 
     args_list = []
     
@@ -49,6 +64,9 @@ def args_maker(arg,file_list):
     
 
 def r0_dl1_1file(arg):
+        """
+        python binding of sst1mpipe_r0_dl1
+        """
 
         cmd = 'sst1mpipe_r0_dl1 --input-file {} \
                --config {} \
@@ -59,6 +77,9 @@ def r0_dl1_1file(arg):
         os.system(cmd)
 
 def dl1_dl1_1file(arg):
+        """
+        python binding of sst1mpipe_data_dl1_dl1_stereo
+        """
         cmd = 'sst1mpipe_data_dl1_dl1_stereo \
                --input-file {} \
                --config {} \
@@ -72,6 +93,9 @@ def dl1_dl1_1file(arg):
 
 
 def dl1_dl2_1file(arg):
+        """
+        python binding of sst1mpipe_dl1_dl2
+        """
         cmd = 'sst1mpipe_dl1_dl2 \
                --input-file {} \
                --config {} \
@@ -85,6 +109,10 @@ def dl1_dl2_1file(arg):
 
 
 def dl1_dl2_1file_1tel(arg):
+        """
+        python binding of sst1mpipe_dl1_dl2
+        """
+
         cmd = 'sst1mpipe_dl1_dl2 \
                --input-file {} \
                --config {} \
@@ -97,6 +125,10 @@ def dl1_dl2_1file_1tel(arg):
         os.system(cmd)
 
 def dl2_dl3_1dir(arg):
+        """
+        python binding of sst1mpipe_data_dl2_dl3
+        """
+
         cmd = 'sst1mpipe_data_dl2_dl3 \
                --input-dir {} \
                --irf-dir {} \
@@ -115,31 +147,30 @@ def dl2_dl3_1dir(arg):
         os.system(cmd)
 
 
-def make_runlist(tel,year,month,day,file_range):
-        runlist = []
-        basedir = '/net/cs{}/data/raw/'.format(tel)
-        tel_str = 'tel{}'.format(tel)
-        for run in range(file_range[0],file_range[1]+1):
-                datestr = "{}{:02d}{:02d}".format(year,month,day)
-                filerad = 'SST1M{}'.format(tel)
-                filepath = os.path.join(basedir,
-                                       str(year),
-                                       "{:02d}".format(month),
-                                       "{:02d}".format(day),
-                                       filerad,
-                                       '{}_{}_{:04d}.fits.fz'.format(filerad,
-                                                                     datestr,
-                                                                     run)
-                                       )
-                runlist.append(filepath)
-        return runlist
 
-def make_runlist_allfiles(tel,year,month,day):
+def make_runlist_allfiles(itel,year,month,day):
+        """
+        make a list of raw data file path
+
+        Parameters
+        ----------
+        itel : int
+            telescope number (1 or 2)
+        year  : int
+
+        month : int
+
+        day   : int
+
+        Returns
+        -------
+        list of raw data file paths    
+        """
         runlist = []
-        basedir = '/net/cs{}/data/raw/'.format(tel)
-        tel_str = 'tel{}'.format(tel)
+        basedir = '/net/cs{}/data/raw/'.format(itel)
+        tel_str = 'tel{}'.format(itel)
         datestr = "{}{:02d}{:02d}".format(year,month,day)
-        filerad = 'SST1M{}'.format(tel)
+        filerad = 'SST1M{}'.format(itel)
         filedir = os.path.join(basedir,
                                        str(year),
                                        "{:02d}".format(month),
@@ -149,6 +180,19 @@ def make_runlist_allfiles(tel,year,month,day):
         return glob.glob(filedir+"/"+filerad+"*.fits.fz")
 
 def refine_file_list(file_list):
+    """
+       sort list of raw data fits based on there TARGET field in header
+
+        Parameters
+        ----------
+        file_list : list
+            list of raw data file paths
+            
+        Returns
+        -------
+        dict of raw data file paths   
+    """
+
     list_dict = dict()
     list_dict['DARK']       = []
     list_dict['Transition'] = []
@@ -165,10 +209,18 @@ def refine_file_list(file_list):
         f.close()
     return list_dict
 
-def run_daily_ana(daily_config_file):
+def run_daily_ana(daily_config):
+    """
+    run daily r0 to dl3 analysis 
 
-    with open(daily_config_file) as json_data_file:
-        daily_config = json.load(json_data_file)
+    Parameters
+    ----------
+    daily_config : json config object
+            
+    Returns
+    -------
+    None
+    """
 
     n_proc           = daily_config["n_proc"]
     ana_dir          = daily_config["ana_dir"]
@@ -188,8 +240,8 @@ def run_daily_ana(daily_config_file):
         year  = (datetime.datetime.now()-datetime.timedelta(days=1)).year
         month = (datetime.datetime.now()-datetime.timedelta(days=1)).month
         day   = (datetime.datetime.now()-datetime.timedelta(days=1)).day
-
-
+    logging.info("---------------------------------------------")
+    logging.info("Daily analysis ({:04d}/{:02d}/{:02d}) START ".format(year,month,day))
     try:
         output_logfile = os.path.join(ana_dir, "logs", 'daily_ana_{:04d}{:02d}{:02d}.log'.format(year,month,day))
     except:
@@ -204,18 +256,18 @@ def run_daily_ana(daily_config_file):
             logging.StreamHandler(stream=sys.stdout)
             ]
     )    
-    ## get raw file list based on file range (todo, based on header ?)
-    raw_file_list_t1 = make_runlist_allfiles(tel = 1,
+    ## get raw file list 
+    raw_file_list_t1 = make_runlist_allfiles(itel = 1,
                                              year=year,
                                              month=month,
                                              day=day)
 
-    raw_file_list_t2 = make_runlist_allfiles(tel = 2,
+    raw_file_list_t2 = make_runlist_allfiles(itel = 2,
                                              year=year,
                                              month=month,
                                              day=day)
  
-    ## refine file list by target in header
+    
     if (len(raw_file_list_t1)==0) and (len(raw_file_list_t2)==0):
         logging.warning("NO DATA FOUND : daily analysis ended")
         return
@@ -223,15 +275,13 @@ def run_daily_ana(daily_config_file):
     if (len(raw_file_list_t1)==0) or (len(raw_file_list_t2)==0):
         stereo = False
 
-    datedir = os.path.join(ana_dir,
-                           '{:04d}{:02d}{:02d}'.format(year,month,day) )
-    Path(datedir).mkdir(exist_ok=True)
-    shutil.copy(daily_config_file, datedir)
-    shutil.copy(config_file, datedir)
 
+
+    ## refine file list by target in header
     dict_list_t1 = refine_file_list(raw_file_list_t1)
     dict_list_t2 = refine_file_list(raw_file_list_t2)
-
+    
+    
     target_list = np.unique(list(dict_list_t1.keys())+list(dict_list_t2.keys()))
     logging.info("Target found ::")
     for target in target_list:
@@ -244,6 +294,19 @@ def run_daily_ana(daily_config_file):
             logging.info('CS2 : {}'.format(len(dict_list_t2[target]) ))
         except :
            logging.warning('no CS2 data')
+
+ 
+
+    ## make direcotory
+    datedir = os.path.join(ana_dir,
+                           '{:04d}{:02d}{:02d}'.format(year,month,day) )
+    Path(datedir).mkdir(exist_ok=True)
+
+    ## copy config files
+    with open(datedir+'/daily_config.json', 'w') as f:
+        json.dump(daily_config, f)
+
+    shutil.copy(config_file, datedir)
 
      
     for target in target_list:
@@ -405,11 +468,11 @@ def run_daily_ana(daily_config_file):
                 aargs.irf_dir = daily_config["irf_dir"]
                 dl2_dl3_1dir(aargs)
             except:
-                logging.error("DL2 > DL3 failed")
+                logging.error("STEREO : DL2 > DL3 failed")
 
 
 
-    logging.info("Daily analysis ended")
+    logging.info("Daily analysis ({:04d}/{:02d}/{:02d}) ended ".format(year,month,day))
 
 if __name__ == '__main__':
 
@@ -423,7 +486,7 @@ if __name__ == '__main__':
     with open(daily_config_file) as json_data_file:
         daily_config = json.load(json_data_file)
 
-    run_daily_ana(daily_config_file)
+    run_daily_ana(daily_config)
 
 
 
