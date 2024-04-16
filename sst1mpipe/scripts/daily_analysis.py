@@ -456,7 +456,7 @@ def run_daily_ana(daily_config):
             pool.close()
             ## DL3
             try:
-                aargs.input_dir   = c2_dl2_dir
+                aargs.input_dir   = cs2_dl2_dir
                 aargs.out_dir     = cs2_dl3_dir
                 aargs.target_name = target
                 aargs.target_ra = target_pos.ra.to_value(u.deg)
