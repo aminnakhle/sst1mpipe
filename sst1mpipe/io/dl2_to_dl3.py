@@ -325,6 +325,9 @@ def dl2_dir_to_dl3(target_name   = None,
     all_files = glob.glob(dl2_dir+'/*dl2.h5')
     all_files.sort()
 
+    if len(all_files)==0:
+        return []
+
     if gammaness_cuts is None:
         df_dl2_unsort, times_unsort, GTIs = load_more_dl2_files(
                 all_files, 
