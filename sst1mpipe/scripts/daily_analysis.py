@@ -147,6 +147,22 @@ def dl2_dl3_1dir(arg):
         os.system(cmd)
 
 
+def extract_dl1_distributions(arg):
+        """
+        python binding of sst1mpipe_extract_dl1_distributions
+        """
+
+        cmd = 'sst1mpipe_extract_dl1_distributions \
+               --dl1-dir {} \
+               --date {} \
+               --output-dir {} \
+               --dl3-index-dir {}'.format(arg.dl1_dir,
+                                          arg.date_str,
+                                          arg.out_dir,
+                                          arg.dl3_dir)
+        logging.info(cmd)
+        os.system(cmd)
+
 
 def make_runlist_allfiles(itel,year,month,day):
         """
@@ -310,7 +326,7 @@ def run_daily_ana(daily_config):
 
      
     for target in target_list:
-        if target in ['DARK','Transition','UNKNOWN','BIAS','WRtest']:
+        if target in ['DARK','Transition','UNKNOWN','BIAS','WRtest',"TRANSITION"]:
             continue
         target_dir = os.path.join(datedir,
                                   '{}'.format(target) )
@@ -339,6 +355,9 @@ def run_daily_ana(daily_config):
             cs1_dl3_dir = os.path.join(cs1_dir,'dl3')
             Path(cs1_dl3_dir).mkdir(exist_ok=True)
 
+            cs1_dqual_dir = os.path.join(cs1_dir,'data_quality')
+            Path(cs1_dqual_dir).mkdir(exist_ok=True)
+
         ## CS2
         if cs2 or stereo:
             cs2_dir = os.path.join(target_dir,'cs2')
@@ -352,6 +371,9 @@ def run_daily_ana(daily_config):
 
             cs2_dl3_dir = os.path.join(cs2_dir,'dl3')
             Path(cs2_dl3_dir).mkdir(exist_ok=True)
+
+            cs2_dqual_dir = os.path.join(cs2_dir,'data_quality')
+            Path(cs2_dqual_dir).mkdir(exist_ok=True)
 
 
         ## STEREO
@@ -367,6 +389,10 @@ def run_daily_ana(daily_config):
 
             stereo_dl3_dir = os.path.join(stereo_dir,'dl3')
             Path(stereo_dl3_dir).mkdir(exist_ok=True)
+
+            stereo_dqual_dir = os.path.join(stereo_dir,'data_quality')
+            Path(stereo_dqual_dir).mkdir(exist_ok=True)
+
 
         ## R0 -> DL1
         # cs1
@@ -417,7 +443,7 @@ def run_daily_ana(daily_config):
                 aargs.irf_dir = daily_config["irf_dir"]
                 dl2_dl3_1dir(aargs)
             except:
-                logging.error("DL2 > DL3 failed")
+                logging.error("CS1 : DL2 > DL3 failed")
 
         # cs2
         if cs2:
@@ -438,7 +464,7 @@ def run_daily_ana(daily_config):
                 aargs.irf_dir = daily_config["irf_dir"]
                 dl2_dl3_1dir(aargs)
             except:
-                logging.error("DL2 > DL3 failed")
+                logging.error("CS2 : DL2 > DL3 failed")
 
         ## STEREO
         if stereo:
@@ -463,14 +489,30 @@ def run_daily_ana(daily_config):
                 aargs.input_dir   = stereo_dl2_dir
                 aargs.out_dir     = stereo_dl3_dir
                 aargs.target_name = target
-                aargs.target_ra = target_pos.ra.to_value(u.deg)
-                aargs.target_dec = target_pos.dec.to_value(u.deg)
-                aargs.irf_dir = daily_config["irf_dir"]
+                aargs.target_ra   = target_pos.ra.to_value(u.deg)
+                aargs.target_dec  = target_pos.dec.to_value(u.deg)
+                aargs.irf_dir     = daily_config["irf_dir"]
                 dl2_dl3_1dir(aargs)
             except:
                 logging.error("STEREO : DL2 > DL3 failed")
 
-
+        ## EXTRACT RATE DISTRIBUTION
+        aargs.date_str = "{:04d}{:02d}{:02d}".format(year,month,day)
+        if cs1:
+            aargs.dl1_dir = cs1_dl1_dir
+            aargs.dl3_dir = cs1_dl3_dir
+            aargs.out_dir = cs1_dqual_dir
+            extract_dl1_distributions(aargs)
+        if cs2:
+            aargs.dl1_dir = cs2_dl1_dir
+            aargs.dl3_dir = cs2_dl3_dir
+            aargs.out_dir = cs2_dqual_dir
+            extract_dl1_distributions(aargs)
+        if stereo:
+            aargs.dl1_dir = stereo_dl1_dir
+            aargs.dl3_dir = stereo_dl3_dir
+            aargs.out_dir = stereo_dqual_dir
+            extract_dl1_distributions(aargs)           
 
     logging.info("Daily analysis ({:04d}/{:02d}/{:02d}) ended ".format(year,month,day))
 
