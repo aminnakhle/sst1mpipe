@@ -21,6 +21,7 @@ $> python sst1mpipe_r0_dl1.py
 """
 
 import sst1mpipe
+from sst1mpipe.utils.NSB_tools import VAR_to_Idrop, get_optical_eff_shift, VAR_to_NSB
 from sst1mpipe.utils import (
     correct_true_image, 
     energy_min_cut,
@@ -324,8 +325,14 @@ def main():
                 r0data = event.sst1m.r0.tel[tel]
 
                 baseline_subtracted = (r0data.adc_samples.T - r0data.digicam_baseline)
-                
-                event.r1.tel[tel].waveform = (baseline_subtracted / dc_to_pe).T
+
+                ## Apply (or not) pixel wise Voltage drop correction
+                ## TODO ?? TOTEST
+                if config['NsbCalibrator']['apply_pixelwise_Vdrop_correction']:
+                    VI = VAR_to_Idrop(pedestal_info.get_charge_std()**2, tel)
+                else:
+                    VI = 1.0
+                event.r1.tel[tel].waveform = (baseline_subtracted / dc_to_pe /VI ).T
                 event.r1.tel[tel].selected_gain_channel = np.zeros(source.subarray.tel[tel].camera.readout.n_pixels,dtype='int8')
 
                 event_type = event.sst1m.r0.tel[tel]._camera_event_type.value
@@ -479,6 +486,17 @@ def main():
                         survived_charge_fraction_2.append(sum(event.simulation.tel[tel].true_image[cleaning_mask])/sum(event.simulation.tel[tel].true_image))
                     else:
                         logging.warning('Telescope %f not recognized, survived charge fraction not logged.', tel)
+
+            ## Correct (or not) the Voltage drop : Global correction on the intensity
+            if not source.is_simulation:
+                I0 = event.dl1.tel[tel].parameters.hillas.intensity
+                if config['NsbCalibrator']['apply_global_Vdrop_correction']:
+                    VI = VAR_to_Idrop (np.median(pedestal_info.get_charge_std()**2),
+                                       tel)
+                    I_corr = I0/VI*config['NsbCalibrator']['tel_{}_intensity_correction'.format(tel)]
+                else:
+                    I_corr = I0*config['NsbCalibrator']['tel_{}_intensity_correction'.format(tel)]
+                event.dl1.tel[tel].parameters.hillas.intensity = I_corr
 
             writer(event)
 
