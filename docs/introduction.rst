@@ -105,7 +105,9 @@ the **ctapipe** data model:
 +-----------+---------------------------------------------------------------------------+-------------+
 
 Scheme of data/MC processing the pipeline:
+
 .. _pipeline_scheme:
+
 .. image:: sst1mpipe_scheme_mono.png
    :width: 700
    :align: center
