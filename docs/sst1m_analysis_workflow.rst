@@ -56,6 +56,9 @@ a look at materials from the last SST-1M hands-on analysis session in Prague, De
 * `Introductory talk <https://indico.cern.ch/event/1337334/contributions/5692346/attachments/2775295/4836434/data_analysis_basics.pdf>`_
 * Jupyter notebooks on Calculus: ``/data/work/analysis/sst1m_analysis_handson_2023/``
 
+To understand general logic of the data processing, see scheme of the pipeline for mono and stereo
+data analysis: :ref:`analysis_basics`.
+
 Configuration files
 ~~~~~~~~~~~~~~~~~~~
 

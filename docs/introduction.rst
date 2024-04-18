@@ -75,8 +75,44 @@ only activate preinstalled environment:
     source /data/work/analysis/software/mambaforge/etc/profile.d/conda.sh
     conda activate /data/work/analysis/software/mambaforge/envs/sst1m-$SST1MPIPE_VER
 
+.. _analysis_basics:
 
 Analysis basics
 ---------------
 
-TBD
+**sst1mpipe** takes the raw waveforms in each camera pixel, calibrates them into the number of photoelectrons, 
+and reconstructs the physical parameters of primary gamma-ray photons such as their energy 
+and arrival direction. It also classifies events to suppress hadronic background. Standard reconstruction is 
+performed using Random Forest regressors and classifiers, which are pre-trained on precise Monte Carlo simulations.
+**sst1mpipe** handles Monte Carlo and Random Forest training as well, and can be also used to estimate SST-1M
+performance. The data analysis is performed in several subsequent steps, where each data level is stored, and so 
+any possible future reprocessing can start from any point in the chain. The data levels used in **sst1mpipe** follow 
+the **ctapipe** data model:
+
++-----------+---------------------------------------------------------------------------+-------------+
+| Data Level| Description                                                               | File Format |
++===========+===========================================================================+=============+
+| R0        | Raw waveforms in each pixel (uncalibrated),                               | ZFITS       |
++-----------+---------------------------------------------------------------------------+-------------+
+| R1        | Calibrated waveforms (in photoelectrons, pedestal subtracted)             |             |
++-----------+---------------------------------------------------------------------------+-------------+
+| DL1       | Integrated charge and peak position of the waveform in each pixel         | HDF5        |
+|           | + Hillas parameters.                                                      |             |
++-----------+---------------------------------------------------------------------------+-------------+
+| DL2       | Reconstructed event parameters (energy, direction, primary type)          | HDF5        |
++-----------+---------------------------------------------------------------------------+-------------+
+| DL3       | Photon lists (after selection and gammaness cut)                          | FITS        |
+|           | + Instrument Response Functions                                           |             |
++-----------+---------------------------------------------------------------------------+-------------+
+
+Scheme of data/MC processing the pipeline:
+
+.. image:: sst1mpipe_scheme_mono.png
+   :width: 700
+   :align: center
+
+.. image:: sst1mpipe_scheme_stereo.png
+   :width: 700
+   :align: center
+
+For a detailed description of all analysis steps, see: :ref:`sst1m_analysis_workflow`.
