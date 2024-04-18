@@ -75,6 +75,7 @@ only activate preinstalled environment:
     source /data/work/analysis/software/mambaforge/etc/profile.d/conda.sh
     conda activate /data/work/analysis/software/mambaforge/envs/sst1m-$SST1MPIPE_VER
 
+.. _analysis_basics:
 
 Analysis basics
 ---------------
@@ -105,8 +106,6 @@ the **ctapipe** data model:
 +-----------+---------------------------------------------------------------------------+-------------+
 
 Scheme of data/MC processing the pipeline:
-
-.. _pipeline_scheme:
 
 .. image:: sst1mpipe_scheme_mono.png
    :width: 700
