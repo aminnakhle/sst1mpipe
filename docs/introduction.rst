@@ -91,13 +91,12 @@ the **ctapipe** data model:
 +-----------+---------------------------------------------------------------------------+-------------+
 | Data Level| Description                                                               | File Format |
 +===========+===========================================================================+=============+
-| R0        | Raw waveforms in each pixel (uncalibrated), one file per-telescope        | ZFITS       |
+| R0        | Raw waveforms in each pixel (uncalibrated),                               | ZFITS       |
 +-----------+---------------------------------------------------------------------------+-------------+
 | R1        | Calibrated waveforms (in photoelectrons, pedestal subtracted)             |             |
 +-----------+---------------------------------------------------------------------------+-------------+
 | DL1       | Integrated charge and peak position of the waveform in each pixel         | HDF5        |
-|           | + Hillas parameters. One file per-telescope in mono reconstruction,       |             |
-|           | single file with coincident events only for stereo reconstruction         |             |
+|           | + Hillas parameters.                                                      |             |
 +-----------+---------------------------------------------------------------------------+-------------+
 | DL2       | Reconstructed event parameters (energy, direction, primary type)          | HDF5        |
 +-----------+---------------------------------------------------------------------------+-------------+
@@ -105,12 +104,14 @@ the **ctapipe** data model:
 |           | + Instrument Response Functions                                           |             |
 +-----------+---------------------------------------------------------------------------+-------------+
 
+Scheme of data/MC processing the pipeline:
+.. _pipeline_scheme:
 .. image:: sst1mpipe_scheme_mono.png
-   :width: 600
+   :width: 700
    :align: center
 
 .. image:: sst1mpipe_scheme_stereo.png
-   :width: 600
+   :width: 700
    :align: center
 
-:ref:`sst1m_analysis_workflow`
+For a detailed description of all analysis steps, see: :ref:`sst1m_analysis_workflow`.
