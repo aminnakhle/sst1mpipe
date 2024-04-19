@@ -204,6 +204,10 @@ def main():
 
     if ismc:
         source = EventSource(input_file, max_events=max_events, allowed_tels=config["allowed_tels"])
+
+        logging.info("MC Tel 21 abs. Corr : {}".format(config['NsbCalibrator']['tel_21_intensity_correction_MC']))
+        logging.info("MC Tel 22 abs. Corr : {}".format(config['NsbCalibrator']['tel_22_intensity_correction_MC']))
+
     else:
         source = SST1MEventSource([input_file], max_events=max_events)
         source._subarray = get_subarray()
@@ -217,7 +221,26 @@ def main():
         else:
             logging.info("{} pedestals events loaded in buffer".format(pedestal_info.get_n_events()))
             pedestals_in_file = True
-        
+
+
+        logging.info("Tel 21 abs. Corr : {}".format(config['NsbCalibrator']['tel_21_intensity_correction']))
+        logging.info("Tel 22 abs. Corr : {}".format(config['NsbCalibrator']['tel_22_intensity_correction']))
+
+
+        if config['NsbCalibrator']['apply_pixelwise_Vdrop_correction']:
+            logging.info(" Voltage drop correction is applyed pixelwise")
+
+        if config['NsbCalibrator']['apply_global_Vdrop_correction']:
+            logging.info(" Voltage drop correction is applyed globaly")
+
+        if config['NsbCalibrator']['apply_global_Vdrop_correction'] == config['NsbCalibrator']['apply_pixelwise_Vdrop_correction']:
+            if config['NsbCalibrator']['apply_global_Vdrop_correction']:
+                logging.error(" Voltage drop correction is applyed 2 times!!! this is WRONG!")
+            else:
+                logging.warning("NO Voltage drop correction is applyed")
+
+
+
         # Reading target name and assumed pointing ra,dec from the target field
         # of the Events fits header
         target, ra_fits, dec_fits, wobble_fits = get_target(input_file)
@@ -487,7 +510,8 @@ def main():
                     else:
                         logging.warning('Telescope %f not recognized, survived charge fraction not logged.', tel)
 
-            ## Correct (or not) the Voltage drop : Global correction on the intensity
+            ## Correct (or not) the Voltage drop effect : Global correction on the intensity
+            ## apply (or not) some absolute correction on the intensity
             if not source.is_simulation:
                 I0 = event.dl1.tel[tel].parameters.hillas.intensity
                 if config['NsbCalibrator']['apply_global_Vdrop_correction']:
@@ -497,6 +521,11 @@ def main():
                 else:
                     I_corr = I0*config['NsbCalibrator']['tel_{}_intensity_correction'.format(tel)]
                 event.dl1.tel[tel].parameters.hillas.intensity = I_corr
+            else:
+                for tel in event.trigger.tels_with_trigger:
+                    I0 = event.dl1.tel[tel].parameters.hillas.intensity
+                    I_corr = I0*config['NsbCalibrator']['tel_{}_intensity_correction_MC'.format(tel)]
+                    event.dl1.tel[tel].parameters.hillas.intensity = I_corr
 
             writer(event)
 
