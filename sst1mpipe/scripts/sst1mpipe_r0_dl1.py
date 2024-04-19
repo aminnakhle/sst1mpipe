@@ -496,7 +496,6 @@ def main():
                             containers=[event.mon.tel[tel].pedestal],
                         )
                     if np.isfinite(event.dl1.tel[tel].parameters.hillas.intensity):
-                        print("alo")
                         n_pedestals_survived += 1
                     continue
 
