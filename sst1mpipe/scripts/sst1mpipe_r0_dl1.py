@@ -205,8 +205,8 @@ def main():
     if ismc:
         source = EventSource(input_file, max_events=max_events, allowed_tels=config["allowed_tels"])
 
-        logging.info("MC Tel 21 abs. Corr : {}".format(config['NsbCalibrator']['tel_21_intensity_correction_MC']))
-        logging.info("MC Tel 22 abs. Corr : {}".format(config['NsbCalibrator']['tel_22_intensity_correction_MC']))
+        logging.info("Tel 1 Intensity correction factor: {}".format(config['NsbCalibrator']['intensity_correction']['tel_001']))
+        logging.info("Tel 2 Intensity correction factor: {}".format(config['NsbCalibrator']['intensity_correction']['tel_002']))
 
     else:
         source = SST1MEventSource([input_file], max_events=max_events)
@@ -222,10 +222,8 @@ def main():
             logging.info("{} pedestals events loaded in buffer".format(pedestal_info.get_n_events()))
             pedestals_in_file = True
 
-
-        logging.info("Tel 21 abs. Corr : {}".format(config['NsbCalibrator']['tel_21_intensity_correction']))
-        logging.info("Tel 22 abs. Corr : {}".format(config['NsbCalibrator']['tel_22_intensity_correction']))
-
+        logging.info("Tel 1 Intensity correction factor: {}".format(config['NsbCalibrator']['intensity_correction']['tel_021']))
+        logging.info("Tel 2 Intensity correction factor: {}".format(config['NsbCalibrator']['intensity_correction']['tel_022']))
 
         if config['NsbCalibrator']['apply_pixelwise_Vdrop_correction']:
             logging.info(" Voltage drop correction is applyed pixelwise")
@@ -238,8 +236,6 @@ def main():
                 logging.error(" Voltage drop correction is applyed 2 times!!! this is WRONG!")
             else:
                 logging.warning("NO Voltage drop correction is applyed")
-
-
 
         # Reading target name and assumed pointing ra,dec from the target field
         # of the Events fits header
@@ -517,14 +513,15 @@ def main():
                 if config['NsbCalibrator']['apply_global_Vdrop_correction']:
                     VI = VAR_to_Idrop (np.median(pedestal_info.get_charge_std()**2),
                                        tel)
-                    I_corr = I0/VI*config['NsbCalibrator']['tel_{}_intensity_correction'.format(tel)]
+                    I_corr = I0/VI*config['NsbCalibrator']["intensity_correction"][tel_string]
                 else:
-                    I_corr = I0*config['NsbCalibrator']['tel_{}_intensity_correction'.format(tel)]
+                    I_corr = I0*config['NsbCalibrator']["intensity_correction"][tel_string]
                 event.dl1.tel[tel].parameters.hillas.intensity = I_corr
             else:
                 for tel in event.trigger.tels_with_trigger:
+                    tel_string = get_tel_string(tel, mc=True)
                     I0 = event.dl1.tel[tel].parameters.hillas.intensity
-                    I_corr = I0*config['NsbCalibrator']['tel_{}_intensity_correction_MC'.format(tel)]
+                    I_corr = I0*config['NsbCalibrator']["intensity_correction"][tel_string]
                     event.dl1.tel[tel].parameters.hillas.intensity = I_corr
 
             writer(event)
