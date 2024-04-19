@@ -487,6 +487,7 @@ def main():
             # Counting pedestal events in the file and skipping them for the output file
             if not source.is_simulation:
                 if event_type == 8:
+
                     n_pedestals += 1
                     # writing pedestal info in dl1
                     if (n_pedestals%21==20):
@@ -494,7 +495,8 @@ def main():
                             table_name='dl1/monitoring/telescope/pedestal',
                             containers=[event.mon.tel[tel].pedestal],
                         )
-                    if event.dl1.tel[tel].parameters.hillas.intensity is not np.nan:
+                    if np.isfinite(event.dl1.tel[tel].parameters.hillas.intensity):
+                        print("alo")
                         n_pedestals_survived += 1
                     continue
 
@@ -512,6 +514,7 @@ def main():
 
             ## Correct (or not) the Voltage drop effect : Global correction on the intensity
             ## apply (or not) some absolute correction on the intensity
+            
             if not source.is_simulation:
                 I0 = event.dl1.tel[tel].parameters.hillas.intensity
                 if config['NsbCalibrator']['apply_global_Vdrop_correction']:
