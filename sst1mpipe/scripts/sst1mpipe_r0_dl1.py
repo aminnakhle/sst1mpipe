@@ -491,7 +491,7 @@ def main():
                             table_name='dl1/monitoring/telescope/pedestal',
                             containers=[event.mon.tel[tel].pedestal],
                         )
-                    if np.isfinite(event.dl1.tel[tel].parameters.hillas.intensity):
+                    if np.isfinite(event.dl1.tel[tel].parameters.hillas.intensity) :
                         n_pedestals_survived += 1
                     continue
 
