@@ -58,6 +58,13 @@
         "invalid_pixel_handler_type": "NeighborAverage"
     },
 
+    "NsbCalibrator": {
+      "intensity_correction": {
+        "tel_001": 1.0,
+        "tel_002": 1.0
+      }
+  },
+
     "ImageProcessor": {
       "image_cleaner_type": "ImageCleanerSST",
       "use_telescope_frame": false,

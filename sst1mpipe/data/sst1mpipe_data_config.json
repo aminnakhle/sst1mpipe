@@ -53,8 +53,8 @@
 
     "analysis": {
       "global_theta_cut": 0.2,
-      "global_gammaness_cut": 0.6,
-      "gamma_efficiency": 0.6,
+      "global_gammaness_cut": 0.75,
+      "gamma_efficiency": 0.7,
       "log_energy_min_tev":-1,
       "log_energy_max_tev": 3,
       "n_energy_bins": 21,
@@ -87,6 +87,15 @@
             "window_width": 7
         },
         "invalid_pixel_handler_type": "NeighborAverage"
+    },
+
+    "NsbCalibrator": {
+        "apply_pixelwise_Vdrop_correction": false,
+        "apply_global_Vdrop_correction": false,
+        "intensity_correction": {
+          "tel_021": 1.0,
+          "tel_022": 1.0
+        }
     },
 
     "ImageProcessor": {
@@ -302,3 +311,4 @@
       }
 
 }
+

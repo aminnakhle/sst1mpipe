@@ -164,7 +164,7 @@ def extract_dl1_distributions(arg):
         os.system(cmd)
 
 
-def make_runlist_allfiles(itel,year,month,day):
+def make_runlist_allfiles(itel,year,month,day,rootdir='/net/'):
         """
         make a list of raw data file path
 
@@ -183,7 +183,7 @@ def make_runlist_allfiles(itel,year,month,day):
         list of raw data file paths    
         """
         runlist = []
-        basedir = '/net/cs{}/data/raw/'.format(itel)
+        basedir = rootdir+'/cs{}/data/raw/'.format(itel)
         tel_str = 'tel{}'.format(itel)
         datestr = "{}{:02d}{:02d}".format(year,month,day)
         filerad = 'SST1M{}'.format(itel)
@@ -249,6 +249,7 @@ def run_daily_ana(daily_config):
     cs1              = daily_config["cs1"]
     cs2              = daily_config["cs2"]
     stereo           = daily_config["stereo"]
+    rootdir          = daily_config["root_dir"]
 
 
     if (year is None) or (month is None) or (day is None):
@@ -276,12 +277,14 @@ def run_daily_ana(daily_config):
     raw_file_list_t1 = make_runlist_allfiles(itel = 1,
                                              year=year,
                                              month=month,
-                                             day=day)
+                                             day=day,
+                                             rootdir=rootdir)
 
     raw_file_list_t2 = make_runlist_allfiles(itel = 2,
                                              year=year,
                                              month=month,
-                                             day=day)
+                                             day=day,
+                                             rootdir=rootdir)
  
     
     if (len(raw_file_list_t1)==0) and (len(raw_file_list_t2)==0):
