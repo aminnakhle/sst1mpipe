@@ -92,11 +92,10 @@
     "NsbCalibrator": {
         "apply_pixelwise_Vdrop_correction": false,
         "apply_global_Vdrop_correction": false,
-        "tel_21_intensity_correction": 1.0,
-        "tel_22_intensity_correction": 1.0,
-        "tel_1_intensity_correction_MC": 1.0,
-        "tel_2_intensity_correction_MC": 1.0
-
+        "intensity_correction": {
+          "tel_021": 1.0,
+          "tel_022": 1.0
+        }
     },
 
     "ImageProcessor": {
