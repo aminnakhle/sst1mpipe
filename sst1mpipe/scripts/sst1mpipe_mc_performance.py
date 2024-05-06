@@ -112,7 +112,7 @@ def parse_args():
                         '--source-detection', '--s',
                         dest='source_detection',
                         default='',
-                        help='Source of interest. Time to the source detection is calculated. Spectrum must be specified in performance.spectra, e.g. CRAB_HEGRA, CRAB_MAGIC_JHEAP2015...,
+                        help='Source of interest. Time to the source detection is calculated. Spectrum must be specified in performance.spectra, e.g. CRAB_HEGRA, CRAB_MAGIC_JHEAP2015...',
                         )
     parser.add_argument(
                         '--energy-min',

@@ -122,7 +122,7 @@ def evaluate_performance(
     if (dl2_gamma['gammaness'] == 0).all():
         logging.info('Gammaness of all events in the input file is equal to 0. Gamma-hadron classifier probably was not applied in DL1->DL2 step and thus no gammaness cut is applied here!')
     else:
-        if gammaness_cuts:
+        if gammaness_cuts != 'global':
             logging.info('Energy and angular resolution are calculated only for gammas which passed ENERGY DEPENDENT GAMMANESS CUT. Optimized on %s', gammaness_cuts)
 
             dl2_gamma_table = Table.from_pandas(dl2_gamma)
@@ -153,7 +153,27 @@ def evaluate_performance(
     # of reconstructed energy (as ctaplot seems to be suggesting in some functions). For now there is 
     # a switch. Default is true energy binning.
     energy_resolution(dl2_gamma, e_bins=energy_bins, outdir=outdir, telescope=telescope, save_fig=save_fig, save_hdf=save_hdf, x_axis_true_energy=True)
-    angular_resolution(dl2_gamma, e_bins=energy_bins, outdir=outdir, telescope=telescope, save_fig=save_fig, save_hdf=save_hdf, x_axis_true_energy=True, axes_sky=True)
+
+    # In mono, here we apply cut on wrongly reconstructed disp sign (following the LST performance paper)
+    # Events with wrongly reco sign are mostly on low energies and they create
+    # a donut shape distorsion of the PSF. The radius of that donut is about 1.5 deg
+    # so it does not affect our ability to distinguish two point-like sources.
+    if telescope == 'stereo':
+        logging.info('Telescope ' + telescope + '. Cut on disp sign is NOT APPLIED for evaluation of angular resolution.')
+        angular_resolution(
+            dl2_gamma, e_bins=energy_bins, outdir=outdir, 
+            telescope=telescope, save_fig=save_fig, save_hdf=save_hdf, 
+            x_axis_true_energy=True, axes_sky=True
+            )
+    else:
+        logging.info('Telescope ' + telescope + '. Cut on disp sign IS APPLIED for evaluation of angular resolution.')
+        mask_disp_sign = dl2_gamma['reco_disp_sign'] == dl2_gamma['disp_sign']
+        angular_resolution(
+            dl2_gamma[mask_disp_sign], e_bins=energy_bins, outdir=outdir, 
+            telescope=telescope, save_fig=save_fig, save_hdf=save_hdf, 
+            x_axis_true_energy=True, axes_sky=True
+            )
+    
     if proton_file is not None:
         roc_curve(gh_testing_dataset, e_bins=energy_bins, outdir=outdir, telescope=telescope, save_fig=save_fig, save_hdf=save_hdf)
     else:
