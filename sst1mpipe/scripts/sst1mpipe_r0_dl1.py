@@ -347,7 +347,7 @@ def main():
 
                 ## Apply (or not) pixel wise Voltage drop correction
                 ## TODO ?? TOTEST
-                if config['NsbCalibrator']['apply_pixelwise_Vdrop_correction']:
+                if config['NsbCalibrator']['apply_pixelwise_Vdrop_correction'] and pedestals_in_file:
                     VI = VAR_to_Idrop(pedestal_info.get_charge_std()**2, tel)
                 else:
                     VI = 1.0
@@ -512,7 +512,7 @@ def main():
             
             if not source.is_simulation:
                 I0 = event.dl1.tel[tel].parameters.hillas.intensity
-                if config['NsbCalibrator']['apply_global_Vdrop_correction']:
+                if config['NsbCalibrator']['apply_global_Vdrop_correction'] and pedestals_in_file:
                     VI = VAR_to_Idrop (np.median(pedestal_info.get_charge_std()**2),
                                        tel)
                     I_corr = I0/VI*config['NsbCalibrator']["intensity_correction"][tel_string]
