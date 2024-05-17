@@ -83,7 +83,7 @@ def main():
     data_path_dl1 = args.dl1_dir
     date = args.date
 
-    bins=np.logspace(1, 5, 500)
+    bins=np.logspace(1, 5, 200)
     bins_width = bins[1:] - bins[:-1]
 
     # get dl3
