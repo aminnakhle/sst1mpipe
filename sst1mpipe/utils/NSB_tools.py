@@ -97,4 +97,15 @@ def VAR_to_NSB(baseline_VAR,ntel,dc_to_pe=None):
                                   no_nsb_f * VAR_to_Idrop(baseline_VAR,ntel))
     return NSB_rate
     
+def shift_to_NSB(baseline_shift,ntel,dc_to_pe=None):
+    if (ntel==21) and (dc_to_pe==None):
+        no_nsb_f = 21.8
+    elif (ntel==22) and (dc_to_pe==None):
+        no_nsb_f = 25.5
+    else:
+        no_nsb_f=dc_to_pe
+    NSB_rate = get_simple_nsbrate(baseline_shift,
+                                  no_nsb_f * VAR_to_Idrop(baseline_VAR,ntel))
+    return NSB_rate
+    
     
