@@ -1573,10 +1573,8 @@ def get_dt_from_altaz(altaz_coord):
               (subarray.positions[21][0] - subarray.positions[22][0])**2 +
               (subarray.positions[21][2] - subarray.positions[22][2])**2)**0.5
 
-    d_telh  = ((subarray.positions[22][1])**2 + 
-               (subarray.positions[22][0])**2)**0.5
     tel_axis_az = (2*np.pi*u.rad-np.arctan(subarray.positions[22][1]/subarray.positions[22][0])).to('deg')
-    tel_axis_alt = np.arcsin(subarray.positions[22][2]/d_telh)
+    tel_axis_alt = np.arcsin(2*subarray.positions[22][2]/d_tels)
     tel_axis_altaz = AltAz(alt=tel_axis_alt,az=tel_axis_az,
                            location=subarray.reference_location)
     DT = (d_tels/c.c * np.cos(tel_axis_altaz.separation( altaz_coord ))).to_value("ns")
