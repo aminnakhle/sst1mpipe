@@ -50,7 +50,7 @@ from astropy.time import Time
 import glob
 
 
-def get_target(file):
+def get_target(file, force_pointing=False):
     """
     Extracts the target information from the string 
     stored in the TARGET field of the input file 
@@ -64,6 +64,9 @@ def get_target(file):
     ----------
     file: string
         Path to the raw fits data file
+    force_poiting: bool
+        If True, Transition flag is ignored and the
+        file is processed anyway
 
     Returns
     -------
@@ -85,7 +88,7 @@ def get_target(file):
             # but targetwobble[]ra[]dec, and also target_wobble[]ra[]dec should work as well
             pointing_string = header['TARGET']
             logging.info('TARGET field: ' + pointing_string)
-            if pointing_string == 'Transition':
+            if pointing_string == 'Transition' and not force_pointing:
                 logging.info('Transition to the next wobble, not stable pointing direction, FILE SKIPPED.')
                 hdul.close()
                 exit()

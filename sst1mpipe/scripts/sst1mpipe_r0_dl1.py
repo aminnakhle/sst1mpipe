@@ -239,7 +239,7 @@ def main():
 
         # Reading target name and assumed pointing ra,dec from the target field
         # of the Events fits header
-        target, ra_fits, dec_fits, wobble_fits = get_target(input_file)
+        target, ra_fits, dec_fits, wobble_fits = get_target(input_file, force_pointing=force_pointing)
         if (ra_fits is not None) & (dec_fits is not None):
             logging.info('Pointing info from the fits file: TARGET: ' + target + ', COORDS: ' + str(ra_fits) + ' ' + str(dec_fits) + ', WOBBLE: ' + wobble_fits)
             if force_pointing & (ra is not None) & (dec is not None):
