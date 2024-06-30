@@ -216,7 +216,9 @@ def main():
         pedestal_info = sliding_pedestals()
         pedestal_info.load_firsts_pedestals(input_file)
         if pedestal_info.get_n_events() == 0:
-            logging.warning("No pedestal events found in firsts events")
+            logging.warning("No pedestal events found in firsts events. Cleaned shower/NSB events used instead.")
+            pedestal_info.load_firsts_fake_pedestals(input_file, config=config)
+            logging.info("{} fake pedestals events loaded in buffer".format(pedestal_info.get_n_events()))
             pedestals_in_file = False
         else:
             logging.info("{} pedestals events loaded in buffer".format(pedestal_info.get_n_events()))
@@ -226,14 +228,14 @@ def main():
         logging.info("Tel 2 Intensity correction factor: {}".format(config['NsbCalibrator']['intensity_correction']['tel_022']))
 
         if config['NsbCalibrator']['apply_pixelwise_Vdrop_correction']:
-            logging.info(" Voltage drop correction is applyed pixelwise")
+            logging.info("Voltage drop correction is applyed pixelwise")
 
         if config['NsbCalibrator']['apply_global_Vdrop_correction']:
-            logging.info(" Voltage drop correction is applyed globaly")
+            logging.info("Voltage drop correction is applyed globaly")
 
         if config['NsbCalibrator']['apply_global_Vdrop_correction'] == config['NsbCalibrator']['apply_pixelwise_Vdrop_correction']:
             if config['NsbCalibrator']['apply_global_Vdrop_correction']:
-                logging.error(" Voltage drop correction is applyed 2 times!!! this is WRONG!")
+                logging.error("Voltage drop correction is applyed 2 times!!! this is WRONG!")
             else:
                 logging.warning("NO Voltage drop correction is applyed")
 
@@ -323,7 +325,6 @@ def main():
         write_images     = True,
 
     ) as writer:
-        
         for i, event in enumerate(source):
 
             if not source.is_simulation:
@@ -347,7 +348,7 @@ def main():
 
                 ## Apply (or not) pixel wise Voltage drop correction
                 ## TODO ?? TOTEST
-                if config['NsbCalibrator']['apply_pixelwise_Vdrop_correction'] and pedestals_in_file:
+                if config['NsbCalibrator']['apply_pixelwise_Vdrop_correction']:
                     VI = VAR_to_Idrop(pedestal_info.get_charge_std()**2, tel)
                 else:
                     VI = 1.0
@@ -374,12 +375,6 @@ def main():
                 # camera refurbishment in 2023. Only R1 waveforms are swapped.
                 if config['swap_modules_59_88'][tel_string]:
                     event = swap_modules_59_88(event, tel=tel)
-
-                ## Fill monitoring container with baseline info :
-                if event_type==8:
-                    pedestal_info.add_ped_evt(event)
-                    pedestal_info.fill_mon_container(event)
-                    
 
             # For an unknown reason, event.simulation.tel[tel].true_image is sometime None, which kills the rest of the script
             # and simulation histogram is not saved. Here we repace it with an array of zeros.
@@ -423,6 +418,19 @@ def main():
                     )
 
             image_processor(event) # dl1a->dl1b (hillas parameters)
+
+            ## Fill monitoring container with baseline info :
+            if not source.is_simulation:
+                if event_type==8:
+                    pedestal_info.add_ped_evt(event)
+                    pedestal_info.fill_mon_container(event)
+                elif not pedestals_in_file:
+                    clenaning_mask = event.dl1.tel[tel].image_mask
+                    # Arbitrary cut, just to prevent too big showers from being used
+                    # We also take only every x-th event to gain some cputime
+                    if (sum(clenaning_mask) < 20) and not bool(i % 10):
+                        pedestal_info.add_ped_evt(event, cleaning_mask=clenaning_mask)
+                        pedestal_info.fill_mon_container(event)
 
             # Extraction of pixel charge distribution for MC-data tuning
             if pixel_charges:
@@ -512,7 +520,7 @@ def main():
             
             if not source.is_simulation:
                 I0 = event.dl1.tel[tel].parameters.hillas.intensity
-                if config['NsbCalibrator']['apply_global_Vdrop_correction'] and pedestals_in_file:
+                if config['NsbCalibrator']['apply_global_Vdrop_correction']:
                     VI = VAR_to_Idrop (np.median(pedestal_info.get_charge_std()**2),
                                        tel)
                     I_corr = I0/VI*config['NsbCalibrator']["intensity_correction"][tel_string]
