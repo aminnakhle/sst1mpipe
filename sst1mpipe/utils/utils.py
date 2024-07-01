@@ -821,6 +821,41 @@ def remove_bad_pixels(event, config=None):
     return event
 
 
+def remove_bad_pixels_gains(event, telescope=None, mask_bad=None):
+    """
+    Fills bad pixel waveforms with zeros and 
+    flags them in proper containers. Charges in 
+    these pixels are then interpolated using method 
+    set in cfg: invalid_pixel_handler_type
+    Default is NeighborAverage, but can be turned 
+    off with 'null'
+
+    Parameters
+    ----------
+    event:
+        sst1mpipe.io.containers.SST1MArrayEventContainer
+    telescope: int
+    mask_bad: numpy.ndarray of bool
+        Array of pixels for which determination of 
+        calibration parameters failed
+
+    Returns
+    -------
+    event:
+        sst1mpipe.io.containers.SST1MArrayEventContainer
+
+    """
+
+    mask_bad = mask_bad.astype(bool)
+    event.r0.tel[telescope].waveform[0][mask_bad] = np.zeros(50)
+    event.r1.tel[telescope].waveform[mask_bad] = np.zeros(50)
+    event.mon.tel[telescope].pixel_status['hardware_failing_pixels'] = np.array([mask_bad])
+    event.mon.tel[telescope].pixel_status['flatfield_failing_pixels'] = np.array([mask_bad])
+    event.mon.tel[telescope].pixel_status['pedestal_failing_pixels'] = np.array([mask_bad])
+
+    return event
+
+
 def check_output_dl1(file):
     """
     Checks if simulated shower distributions

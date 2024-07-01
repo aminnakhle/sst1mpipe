@@ -18,13 +18,19 @@ def get_dc_to_pe(calibration_parameters):
     Returns
     -------
     dc_to_pe: numpy.ndarray
+    mask_bad: numpy.ndarray of bool
+        Array of pixels for which determination of 
+        calibration parameters failed
 
     """
 
     dc_to_pe = np.array(calibration_parameters['dc_to_pe']) 
-    ok_mask = calibration_parameters['calib_flag']==1
-    dc_to_pe[~ok_mask] = dc_to_pe[ok_mask].mean()
-    return dc_to_pe
+    mask_bad = calibration_parameters['calib_flag'] != 1
+
+    # This is an alternative to signal interpolation. We can repace weird
+    # gains with their global average (JJ: I think this is not very nice..)
+    # dc_to_pe[mask_bad] = dc_to_pe[~mask_bad].mean()
+    return dc_to_pe, mask_bad
 
 
 def get_default_calibration(telescope=None):

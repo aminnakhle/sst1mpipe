@@ -26,6 +26,7 @@ from sst1mpipe.utils import (
     correct_true_image, 
     energy_min_cut,
     remove_bad_pixels,
+    remove_bad_pixels_gains,
     add_pointing_to_events,
     add_event_id,
     add_trigger_time,
@@ -333,7 +334,7 @@ def main():
                 if i == 0:
                     tel = event.sst1m.r0.tels_with_data[0]
                     calibration_parameters, calib_file = get_calibration_parameters(telescope=tel, config=config)
-                    dc_to_pe = get_dc_to_pe(calibration_parameters)
+                    dc_to_pe, mask_bad_px = get_dc_to_pe(calibration_parameters)
                     window_corr_factors, window_file = get_window_corr_factors(telescope=tel, config=config)
                     tel_string = get_tel_string(tel, mc=False)
                     location = get_location(config=config, tel=tel_string)
@@ -375,6 +376,11 @@ def main():
                 # camera refurbishment in 2023. Only R1 waveforms are swapped.
                 if config['swap_modules_59_88'][tel_string]:
                     event = swap_modules_59_88(event, tel=tel)
+
+                # This function removes bad pixels with not well determined dc_to_pe
+                # Charges in these pixels are then interpolated using method set in cfg: invalid_pixel_handler_type
+                # Default is NeighborAverage, but can be turned off with 'null'
+                event = remove_bad_pixels_gains(event, telescope=tel, mask_bad=mask_bad_px)
 
             # For an unknown reason, event.simulation.tel[tel].true_image is sometime None, which kills the rest of the script
             # and simulation histogram is not saved. Here we repace it with an array of zeros.
