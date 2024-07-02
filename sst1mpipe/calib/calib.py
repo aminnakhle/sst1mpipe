@@ -52,12 +52,21 @@ def get_default_calibration(telescope=None):
 
     """
 
+    # Calibration parameters averaged from all darks taken between 
+    # March 2023 and June 2024 (TEL1) and Sep 2023 and June 2024 (TEL2).
+    # Based on TT's study, there is a relative difference in the dc_to_pe
+    # factor between individual darks on the level of 5%, showing a 
+    # slowly decreasing trend. In the future, we may start producing 
+    # calibration files "per season" to mitigate the systematic uncertainty,
+    # but per-night is not necessary. TT also confirms that dc_to_pe
+    # does not depend on the level of DCR (the camera temperature).
+    default_calib_file_tel1 = 'averaged_calib_param_v2_2023_2024_tel1.h5'
+    default_calib_file_tel2 = 'averaged_calib_param_v2_2023_2024_tel2.h5'
+
     if (telescope == 21) or (telescope == 1):
-        default_calib_file_tel1 = '20230917_0528_0529_Tel1_fitted_parameters.h5'
         logging.info('Calib file used: ' + default_calib_file_tel1)
         calibration_file = pkg_resources.resource_filename('sst1mpipe',path.join('data',default_calib_file_tel1))
     elif (telescope == 22) or (telescope == 2):
-        default_calib_file_tel2 = '20230921_0149_0150_Tel2_fitted_parameters.h5'
         logging.info('Calib file used: ' + default_calib_file_tel2)
         calibration_file = pkg_resources.resource_filename('sst1mpipe',path.join('data', default_calib_file_tel2)) 
     else:
