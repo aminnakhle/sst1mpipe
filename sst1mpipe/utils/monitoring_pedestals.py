@@ -3,10 +3,7 @@ import astropy.units as u
 
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
 
-from sst1mpipe.calib import (
-    get_calibration_parameters,
-    get_dc_to_pe,
-)
+from sst1mpipe.calib import Calibrator_R0_R1
 from ctapipe.calib import CameraCalibrator
 from ctapipe.image import ImageProcessor
 from sst1mpipe.utils import get_subarray
@@ -99,18 +96,12 @@ class sliding_pedestals:
         image_processor   = ImageProcessor(subarray=source.subarray, config=config)
 
         for ii,event in enumerate(source):
-            tel = event.sst1m.r0.tels_with_data[0]
-            r0data = event.sst1m.r0.tel[tel]
 
             if ii == 0:
-                calibration_parameters, calib_file = get_calibration_parameters(telescope=tel, config=config)
-                dc_to_pe = get_dc_to_pe(calibration_parameters)
+                tel = event.sst1m.r0.tels_with_data[0]
+                calibrator_r0_r1 = Calibrator_R0_R1(config=config, telescope=tel)
 
-            event.trigger.tels_with_trigger = [tel]
-            r0data = event.sst1m.r0.tel[tel]    
-
-            baseline_subtracted = (r0data.adc_samples.T - r0data.digicam_baseline)
-            event.r1.tel[tel].waveform = (baseline_subtracted / dc_to_pe).T
+            event = calibrator_r0_r1.calibrate(event)
             event.r1.tel[tel].selected_gain_channel = np.zeros(source.subarray.tel[tel].camera.readout.n_pixels,dtype='int8')
 
             r1_dl1_calibrator(event)

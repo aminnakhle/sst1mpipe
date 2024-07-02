@@ -30,7 +30,6 @@ from .utils import (
     mc_correct_shower_reuse,
     check_same_shower_fraction,
     remove_bad_pixels,
-    remove_bad_pixels_gains,
     check_output_dl1,
     check_mc,
     add_pointing_to_events,

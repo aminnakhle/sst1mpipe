@@ -4,107 +4,7 @@ import pandas as pd
 from os import path
 import logging
 from sst1mpipe.utils import get_tel_string
-
-def get_dc_to_pe(calibration_parameters):
-    """
-    Gets ADC -> p.e. conversion factor from the 
-    calibration file. Gain drop is not taken 
-    int account!
-
-    Parameters
-    ----------
-    calibration_parameters: pandas.DataFrame
-
-    Returns
-    -------
-    dc_to_pe: numpy.ndarray
-    mask_bad: numpy.ndarray of bool
-        Array of pixels for which determination of 
-        calibration parameters failed
-
-    """
-
-    dc_to_pe = np.array(calibration_parameters['dc_to_pe']) 
-    mask_bad = calibration_parameters['calib_flag'] != 1
-
-    # This is an alternative to signal interpolation. We can repace weird
-    # gains with their global average (JJ: I think this is not very nice..)
-    # dc_to_pe[mask_bad] = dc_to_pe[~mask_bad].mean()
-    return dc_to_pe, mask_bad
-
-
-def get_default_calibration(telescope=None):
-    """
-    Provides default calibration file, used in 
-    the case when it is not defined in the 
-    configuration file.
-
-    Parameters
-    ----------
-    telescope: int
-        Telescope number as in
-        event.sst1m.r0.tels_with_data
-
-    Returns
-    -------
-    calibration_parameters: pandas.DataFrame
-    calib_file: string
-
-    """
-
-    # Calibration parameters averaged from all darks taken between 
-    # March 2023 and June 2024 (TEL1) and Sep 2023 and June 2024 (TEL2).
-    # Based on TT's study, there is a relative difference in the dc_to_pe
-    # factor between individual darks on the level of 5%, showing a 
-    # slowly decreasing trend. In the future, we may start producing 
-    # calibration files "per season" to mitigate the systematic uncertainty,
-    # but per-night is not necessary. TT also confirms that dc_to_pe
-    # does not depend on the level of DCR (the camera temperature).
-    default_calib_file_tel1 = 'averaged_calib_param_v2_2023_2024_tel1.h5'
-    default_calib_file_tel2 = 'averaged_calib_param_v2_2023_2024_tel2.h5'
-
-    if (telescope == 21) or (telescope == 1):
-        logging.info('Calib file used: ' + default_calib_file_tel1)
-        calibration_file = pkg_resources.resource_filename('sst1mpipe',path.join('data',default_calib_file_tel1))
-    elif (telescope == 22) or (telescope == 2):
-        logging.info('Calib file used: ' + default_calib_file_tel2)
-        calibration_file = pkg_resources.resource_filename('sst1mpipe',path.join('data', default_calib_file_tel2)) 
-    else:
-        logging.error('Telescope {} not known'.format(tel))
-    calibration_parameters = pd.read_hdf(calibration_file)
-    return calibration_parameters, calibration_file
-
-
-def get_calibration_parameters(telescope=None, config=None):
-    """
-    Finds and reads the calibration file.
-
-    Parameters
-    ----------
-    telescope: int
-        Telescope number as in
-        event.sst1m.r0.tels_with_data
-    config: dict
-
-    Returns
-    -------
-    calibration_parameters: pandas.DataFrame
-    calib_file: string
-
-    """
-
-    if "telescope_calibration" in config:
-        if config["telescope_calibration"]["tel_" + str(telescope).zfill(3)]:
-            calib_file = config["telescope_calibration"]["tel_" + str(telescope).zfill(3)]
-            calibration_parameters = pd.read_hdf(calib_file)
-            logging.info("Calibration File for Tel %s: %s", telescope, calib_file)
-        else:
-            logging.info("NO CALIBRATION FILE FOR TELESCOPE %s FOUND IN THE CFG FILE, DEFAULT CALIBRATION USED.", telescope)
-            calibration_parameters, calib_file = get_default_calibration(telescope=telescope)
-    else:
-        logging.info("NO CALIBRATION FILE FOR TELESCOPE %s FOUND IN THE CFG FILE, DEFAULT CALIBRATION USED.", telescope)
-        calibration_parameters, calib_file = get_default_calibration(telescope=telescope)
-    return calibration_parameters, calib_file
+from sst1mpipe.utils.NSB_tools import VAR_to_Idrop
 
 
 def get_default_window(telescope=None):
@@ -304,3 +204,162 @@ def saturated_charge_correction(event, adc_samples=None, telescope=None):
             event.dl1.tel[telescope].peak_time = peaktime_new
 
     return event, saturated
+
+
+class Calibrator_R0_R1:
+
+    """
+    R0 -> R1 calibration
+
+    Attributes
+    ----------
+        calibration_parameters: Pandas DataFrame
+            Calibration parameters
+        calibration_file: string
+            File with calibration parameters
+        dc_to_pe: numpy array
+            ADC -> p.e. conversion factors
+            (no gain drop)
+        telescope: int
+            Telescope number: 21/22
+        config: dict
+            Configuration
+        baseline_subtracted: numpy array
+            baseline subtracted waveforms
+        mask_bad: numpy array
+            Mask of bad pixels (True if bad)
+
+    Returns
+    -------
+        event:
+            sst1mpipe.io.containers.SST1MArrayEventContainer
+    """
+
+    def __init__(self, config=None, telescope=None):
+
+        self.calibration_parameters = pd.DataFrame()
+        self.calibration_file = ''
+        self.dc_to_pe = np.array([])
+        self.telescope = telescope
+        self.config = config
+        self.baseline_subtracted = np.array([])
+        self.mask_bad = np.array([])
+
+        # get calibration parameters during initialization
+        self.get_calibration_parameters()
+        self.get_dc_to_pe()
+
+
+    def calibrate(self, event, pedestal_info=None):
+
+        r0data = event.sst1m.r0.tel[self.telescope]
+        self.baseline_subtracted = (r0data.adc_samples.T - r0data.digicam_baseline)
+
+        ## Apply (or not) pixel wise Voltage drop correction
+        ## TODO ?? TOTEST
+        if self.config['NsbCalibrator']['apply_pixelwise_Vdrop_correction']:
+            VI = VAR_to_Idrop(pedestal_info.get_charge_std()**2, self.telescope)
+        else:
+            VI = 1.0
+            
+        event.r1.tel[self.telescope].waveform = (self.baseline_subtracted / self.dc_to_pe / VI ).T
+
+        # This function removes bad pixels with not well determined dc_to_pe
+        # Charges in these pixels are then interpolated using method set in cfg: invalid_pixel_handler_type
+        # Default is NeighborAverage, but can be turned off with 'null'
+        event = self.remove_bad_pixels_gains(event)
+
+        return event
+
+
+    def get_calibration_parameters(self):
+
+        """
+        Finds and reads the calibration file.
+
+        """
+        
+        if "telescope_calibration" in self.config:
+            if self.config["telescope_calibration"]["tel_" + str(self.telescope).zfill(3)]:
+                self.calib_file = self.config["telescope_calibration"]["tel_" + str(self.telescope).zfill(3)]
+                self.calibration_parameters = pd.read_hdf(calib_file)
+                logging.info("Calibration File for Tel %s: %s", self.telescope, calib_file)
+            else:
+                logging.info("NO CALIBRATION FILE FOR TELESCOPE %s FOUND IN THE CFG FILE, DEFAULT CALIBRATION USED.", self.telescope)
+                self.get_default_calibration()
+        else:
+            logging.info("NO CALIBRATION FILE FOR TELESCOPE %s FOUND IN THE CFG FILE, DEFAULT CALIBRATION USED.", self.telescope)
+            self.get_default_calibration()
+
+
+    def get_default_calibration(self):
+        """
+        Provides default calibration file, used in 
+        the case when it is not defined in the 
+        configuration file.
+
+        """
+
+        # Calibration parameters averaged from all darks taken between 
+        # March 2023 and June 2024 (TEL1) and Sep 2023 and June 2024 (TEL2).
+        # Based on TT's study, there is a relative difference in the dc_to_pe
+        # factor between individual darks on the level of 5%, showing a 
+        # slowly decreasing trend. In the future, we may start producing 
+        # calibration files "per season" to mitigate the systematic uncertainty,
+        # but per-night is not necessary. TT also confirms that dc_to_pe
+        # does not depend on the level of DCR (the camera temperature).
+        default_calib_file_tel1 = 'averaged_calib_param_v2_2023_2024_tel1.h5'
+        default_calib_file_tel2 = 'averaged_calib_param_v2_2023_2024_tel2.h5'
+
+        if (self.telescope == 21) or (self.telescope == 1):
+            logging.info('Calib file used: ' + default_calib_file_tel1)
+            self.calibration_file = pkg_resources.resource_filename('sst1mpipe',path.join('data',default_calib_file_tel1))
+        elif (self.telescope == 22) or (self.telescope == 2):
+            logging.info('Calib file used: ' + default_calib_file_tel2)
+            self.calibration_file = pkg_resources.resource_filename('sst1mpipe',path.join('data', default_calib_file_tel2)) 
+        else:
+            logging.error('Telescope {} not known'.format(tel))
+        self.calibration_parameters = pd.read_hdf(self.calibration_file)
+
+
+    def get_dc_to_pe(self):
+        """
+        Gets ADC -> p.e. conversion factor from the 
+        calibration file. Gain drop is not taken 
+        int account!
+
+        """
+
+        self.dc_to_pe = np.array(self.calibration_parameters['dc_to_pe']) 
+        self.mask_bad = self.calibration_parameters['calib_flag'] != 1
+
+
+    def remove_bad_pixels_gains(self, event):
+        """
+        Fills bad pixel waveforms with zeros and 
+        flags them in proper containers. Charges in 
+        these pixels are then interpolated using method 
+        set in cfg: invalid_pixel_handler_type
+        Default is NeighborAverage, but can be turned 
+        off with 'null'
+
+        Parameters
+        ----------
+        event:
+            sst1mpipe.io.containers.SST1MArrayEventContainer
+
+        Returns
+        -------
+        event:
+            sst1mpipe.io.containers.SST1MArrayEventContainer
+
+        """
+
+        mask_bad = self.mask_bad.astype(bool)
+        event.r0.tel[self.telescope].waveform[0][mask_bad] = np.zeros(50)
+        event.r1.tel[self.telescope].waveform[mask_bad] = np.zeros(50)
+        event.mon.tel[self.telescope].pixel_status['hardware_failing_pixels'] = np.array([mask_bad])
+        event.mon.tel[self.telescope].pixel_status['flatfield_failing_pixels'] = np.array([mask_bad])
+        event.mon.tel[self.telescope].pixel_status['pedestal_failing_pixels'] = np.array([mask_bad])
+
+        return event

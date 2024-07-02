@@ -26,7 +26,6 @@ from sst1mpipe.utils import (
     correct_true_image, 
     energy_min_cut,
     remove_bad_pixels,
-    remove_bad_pixels_gains,
     add_pointing_to_events,
     add_event_id,
     add_trigger_time,
@@ -53,11 +52,10 @@ from sst1mpipe.io import (
 )
 
 from sst1mpipe.calib import (
-    get_calibration_parameters,
-    get_dc_to_pe,
     window_transmittance_correction,
     get_window_corr_factors,
-    saturated_charge_correction
+    saturated_charge_correction,
+    Calibrator_R0_R1
 )
 
 from ctapipe.io import EventSource
@@ -333,8 +331,7 @@ def main():
                 # NOTE: This needs to be changed in the future when event source hopefuly provides events with both telescope data
                 if i == 0:
                     tel = event.sst1m.r0.tels_with_data[0]
-                    calibration_parameters, calib_file = get_calibration_parameters(telescope=tel, config=config)
-                    dc_to_pe, mask_bad_px = get_dc_to_pe(calibration_parameters)
+                    calibrator_r0_r1 = Calibrator_R0_R1(config=config, telescope=tel)
                     window_corr_factors, window_file = get_window_corr_factors(telescope=tel, config=config)
                     tel_string = get_tel_string(tel, mc=False)
                     location = get_location(config=config, tel=tel_string)
@@ -343,19 +340,10 @@ def main():
                         logging.info('Swapping wrongly connected modules 59 and 88 for ' + tel_string)
 
                 event.trigger.tels_with_trigger = [tel]
-                r0data = event.sst1m.r0.tel[tel]
 
-                baseline_subtracted = (r0data.adc_samples.T - r0data.digicam_baseline)
+                event = calibrator_r0_r1.calibrate(event, pedestal_info=pedestal_info)
 
-                ## Apply (or not) pixel wise Voltage drop correction
-                ## TODO ?? TOTEST
-                if config['NsbCalibrator']['apply_pixelwise_Vdrop_correction']:
-                    VI = VAR_to_Idrop(pedestal_info.get_charge_std()**2, tel)
-                else:
-                    VI = 1.0
-                event.r1.tel[tel].waveform = (baseline_subtracted / dc_to_pe /VI ).T
                 event.r1.tel[tel].selected_gain_channel = np.zeros(source.subarray.tel[tel].camera.readout.n_pixels,dtype='int8')
-
                 event_type = event.sst1m.r0.tel[tel]._camera_event_type.value
 
                 # Fill trigger container properly
@@ -376,11 +364,6 @@ def main():
                 # camera refurbishment in 2023. Only R1 waveforms are swapped.
                 if config['swap_modules_59_88'][tel_string]:
                     event = swap_modules_59_88(event, tel=tel)
-
-                # This function removes bad pixels with not well determined dc_to_pe
-                # Charges in these pixels are then interpolated using method set in cfg: invalid_pixel_handler_type
-                # Default is NeighborAverage, but can be turned off with 'null'
-                event = remove_bad_pixels_gains(event, telescope=tel, mask_bad=mask_bad_px)
 
             # For an unknown reason, event.simulation.tel[tel].true_image is sometime None, which kills the rest of the script
             # and simulation histogram is not saved. Here we repace it with an array of zeros.
@@ -412,7 +395,7 @@ def main():
 
                 # Integration correction of saturated pixels
                 event, saturated = saturated_charge_correction(event, 
-                adc_samples=baseline_subtracted,
+                adc_samples=calibrator_r0_r1.baseline_subtracted,
                 telescope=tel
                 )
                 if saturated: n_saturated += 1
@@ -527,7 +510,7 @@ def main():
             if not source.is_simulation:
                 I0 = event.dl1.tel[tel].parameters.hillas.intensity
                 if config['NsbCalibrator']['apply_global_Vdrop_correction']:
-                    VI = VAR_to_Idrop (np.median(pedestal_info.get_charge_std()**2),
+                    VI = VAR_to_Idrop(np.median(pedestal_info.get_charge_std()**2),
                                        tel)
                     I_corr = I0/VI*config['NsbCalibrator']["intensity_correction"][tel_string]
                 else:
@@ -608,7 +591,7 @@ def main():
             dec=dec,
             manual_coords=pointing_manual,
             wobble=wobble_fits,
-            calib_file=calib_file, 
+            calib_file=calibrator_r0_r1.calibration_file, 
             window_file=window_file, 
             n_saturated=n_saturated, 
             n_pedestal=n_pedestals, 
