@@ -229,10 +229,6 @@ class Calibrator_R0_R1:
         mask_bad: numpy array
             Mask of bad pixels (True if bad)
 
-    Returns
-    -------
-        event:
-            sst1mpipe.io.containers.SST1MArrayEventContainer
     """
 
     def __init__(self, config=None, telescope=None):
@@ -251,6 +247,23 @@ class Calibrator_R0_R1:
 
 
     def calibrate(self, event, pedestal_info=None):
+
+        """
+        Runs the calibration.
+
+        Parameters
+        ----------
+        event:
+            sst1mpipe.io.containers.SST1MArrayEventContainer
+        pedestal_info:
+            class handling the parameters of pedesta events 
+            in a sliding window
+
+        Returns
+        -------
+        event:
+            sst1mpipe.io.containers.SST1MArrayEventContainer
+        """
 
         r0data = event.sst1m.r0.tel[self.telescope]
         self.baseline_subtracted = (r0data.adc_samples.T - r0data.digicam_baseline)
