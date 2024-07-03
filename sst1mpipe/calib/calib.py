@@ -124,7 +124,7 @@ def window_transmittance_correction(
     return event
 
 
-def saturated_charge_correction(event, adc_samples=None, telescope=None):
+def saturated_charge_correction(event):
     """
     Finds saturated waveforms and applies different peak integration on
     them, as the standard one does not perform well in such cases. This
@@ -136,11 +136,6 @@ def saturated_charge_correction(event, adc_samples=None, telescope=None):
     ----------
     event: 
         sst1mpipe.io.containers.SST1MArrayEventContainer
-    adc_samples: numpy.ndarray
-        Baseline subtracted waveforms
-    telescope: int
-        Telescope number as in
-        event.sst1m.r0.tels_with_data
 
     Returns
     -------
@@ -155,6 +150,10 @@ def saturated_charge_correction(event, adc_samples=None, telescope=None):
     width_level = 2500
     width_threshold = 5
     integration_level = 0.2
+
+    telescope = event.sst1m.r0.tels_with_data[0]
+    r0data = event.sst1m.r0.tel[telescope]
+    adc_samples = (r0data.adc_samples.T - r0data.digicam_baseline)
 
     # saturated pixels
     mask_saturated = np.max(adc_samples, axis=0) > saturated_threshold
@@ -224,8 +223,6 @@ class Calibrator_R0_R1:
             Telescope number: 21/22
         config: dict
             Configuration
-        baseline_subtracted: numpy array
-            baseline subtracted waveforms
         mask_bad: numpy array
             Mask of bad pixels (True if bad)
 
@@ -238,7 +235,6 @@ class Calibrator_R0_R1:
         self.dc_to_pe = np.array([])
         self.telescope = telescope
         self.config = config
-        self.baseline_subtracted = np.array([])
         self.mask_bad = np.array([])
 
         # get calibration parameters during initialization
@@ -266,7 +262,7 @@ class Calibrator_R0_R1:
         """
 
         r0data = event.sst1m.r0.tel[self.telescope]
-        self.baseline_subtracted = (r0data.adc_samples.T - r0data.digicam_baseline)
+        baseline_subtracted = (r0data.adc_samples.T - r0data.digicam_baseline)
 
         ## Apply (or not) pixel wise Voltage drop correction
         ## TODO ?? TOTEST
@@ -275,7 +271,7 @@ class Calibrator_R0_R1:
         else:
             VI = 1.0
             
-        event.r1.tel[self.telescope].waveform = (self.baseline_subtracted / self.dc_to_pe / VI ).T
+        event.r1.tel[self.telescope].waveform = (baseline_subtracted / self.dc_to_pe / VI ).T
 
         # This function removes bad pixels with not well determined dc_to_pe
         # Charges in these pixels are then interpolated using method set in cfg: invalid_pixel_handler_type

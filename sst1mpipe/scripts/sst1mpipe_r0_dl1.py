@@ -394,10 +394,7 @@ def main():
             if not source.is_simulation:
 
                 # Integration correction of saturated pixels
-                event, saturated = saturated_charge_correction(event, 
-                adc_samples=calibrator_r0_r1.baseline_subtracted,
-                telescope=tel
-                )
+                event, saturated = saturated_charge_correction(event)
                 if saturated: n_saturated += 1
 
                 event = window_transmittance_correction(
