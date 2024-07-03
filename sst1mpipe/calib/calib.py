@@ -291,8 +291,8 @@ class Calibrator_R0_R1:
         if "telescope_calibration" in self.config:
             if self.config["telescope_calibration"]["tel_" + str(self.telescope).zfill(3)]:
                 self.calib_file = self.config["telescope_calibration"]["tel_" + str(self.telescope).zfill(3)]
-                self.calibration_parameters = pd.read_hdf(calib_file)
-                logging.info("Calibration File for Tel %s: %s", self.telescope, calib_file)
+                self.calibration_parameters = pd.read_hdf(self.calib_file)
+                logging.info("Calibration File for Tel %s: %s", self.telescope, self.calib_file)
             else:
                 logging.info("NO CALIBRATION FILE FOR TELESCOPE %s FOUND IN THE CFG FILE, DEFAULT CALIBRATION USED.", self.telescope)
                 self.get_default_calibration()
