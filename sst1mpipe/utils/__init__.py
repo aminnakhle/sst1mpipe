@@ -67,6 +67,6 @@ from .NSB_tools import (
     gain_drop_th
     )
 
-from .monitoring_pedestals import (
-    sliding_pedestals,
-)
+#from .monitoring_pedestals import (
+#    sliding_pedestals,
+#)
