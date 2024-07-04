@@ -21,7 +21,6 @@ $> python sst1mpipe_r0_dl1.py
 """
 
 import sst1mpipe
-from sst1mpipe.utils.NSB_tools import VAR_to_Idrop, get_optical_eff_shift, VAR_to_NSB
 from sst1mpipe.utils import (
     correct_true_image, 
     energy_min_cut,
@@ -33,9 +32,11 @@ from sst1mpipe.utils import (
     get_location,
     get_subarray,
     image_cleaner_setup,
-    sliding_pedestals,
-    swap_modules_59_88
+    swap_modules_59_88,
+    VAR_to_Idrop
 )
+from sst1mpipe.utils.monitoring_pedestals import sliding_pedestals
+
 from sst1mpipe.io import (
     write_extra_parameters,
     load_config,

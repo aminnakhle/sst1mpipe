@@ -3,8 +3,10 @@ import pkg_resources
 import pandas as pd
 from os import path
 import logging
-from sst1mpipe.utils import get_tel_string
-from sst1mpipe.utils.NSB_tools import VAR_to_Idrop
+from sst1mpipe.utils import (
+    get_tel_string, 
+    VAR_to_Idrop
+    )
 
 
 def get_default_window(telescope=None):
