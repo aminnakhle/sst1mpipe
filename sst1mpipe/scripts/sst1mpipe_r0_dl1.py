@@ -343,6 +343,7 @@ def main():
                 event.trigger.tels_with_trigger = [tel]
 
                 event = calibrator_r0_r1.calibrate(event, pedestal_info=pedestal_info)
+                # print(calibrator_r0_r1.pixels_removed) # can be monitored
 
                 event.r1.tel[tel].selected_gain_channel = np.zeros(source.subarray.tel[tel].camera.readout.n_pixels,dtype='int8')
                 event_type = event.sst1m.r0.tel[tel]._camera_event_type.value
