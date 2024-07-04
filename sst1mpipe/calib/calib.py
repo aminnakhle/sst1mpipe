@@ -238,6 +238,7 @@ class Calibrator_R0_R1:
         self.telescope = telescope
         self.config = config
         self.mask_bad = np.array([])
+        self.pixels_removed = int
 
         # get calibration parameters during initialization
         self.get_calibration_parameters()
@@ -275,10 +276,12 @@ class Calibrator_R0_R1:
             
         event.r1.tel[self.telescope].waveform = (baseline_subtracted / self.dc_to_pe / VI ).T
 
-        # This function removes bad pixels with not well determined dc_to_pe
+        # This function removes bad pixels 
+        # - with not well determined dc_to_pe
+        # - based on pedestal variation, i.e. dynamicaly
         # Charges in these pixels are then interpolated using method set in cfg: invalid_pixel_handler_type
         # Default is NeighborAverage, but can be turned off with 'null'
-        event = self.remove_bad_pixels_gains(event)
+        event = self.remove_bad_pixels_calib(event, pedestal_info=pedestal_info)
 
         return event
 
@@ -342,10 +345,11 @@ class Calibrator_R0_R1:
         """
 
         self.dc_to_pe = np.array(self.calibration_parameters['dc_to_pe']) 
+        # masking pixels with bad calibration parameters
         self.mask_bad = self.calibration_parameters['calib_flag'] != 1
 
 
-    def remove_bad_pixels_gains(self, event):
+    def remove_bad_pixels_calib(self, event, pedestal_info=None):
         """
         Fills bad pixel waveforms with zeros and 
         flags them in proper containers. Charges in 
@@ -366,7 +370,17 @@ class Calibrator_R0_R1:
 
         """
 
-        mask_bad = self.mask_bad.astype(bool)
+        # masking pixels with bad calibration parameters
+        mask_bad_calib = self.mask_bad.astype(bool)
+
+        # masking pixels with too low baseline std
+        if pedestal_info is not None:
+            mask_bad_std = pedestal_info.get_charge_std() < 2.5
+            mask_bad = mask_bad_calib + mask_bad_std
+        else:
+            mask_bad = mask_bad_calib
+        self.pixels_removed = sum(mask_bad)
+
         event.r0.tel[self.telescope].waveform[0][mask_bad] = np.zeros(50)
         event.r1.tel[self.telescope].waveform[mask_bad] = np.zeros(50)
         event.mon.tel[self.telescope].pixel_status['hardware_failing_pixels'] = np.array([mask_bad])
