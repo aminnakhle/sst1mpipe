@@ -408,9 +408,29 @@ def main():
             ## Fill monitoring container with baseline info :
             if not source.is_simulation:
                 if event_type==8:
+                    # writing pedestal info in dl1
+                    if ( (pedestal_info.processed_pedestals !=0) and \
+                         (pedestal_info.processed_pedestals%20 == 0)):
+
+                        writer._writer.write(
+                            table_name='dl1/monitoring/telescope/pedestal',
+                            containers=[event.mon.tel[tel].pedestal],
+                        )
+
                     pedestal_info.add_ped_evt(event)
                     pedestal_info.fill_mon_container(event)
+
+
+
                 elif not pedestals_in_file:
+                    # writing pedestal info in dl1
+                    if ( (pedestal_info.processed_pedestals !=0) and \
+                         (pedestal_info.processed_pedestals%20 == 0)):
+
+                        writer._writer.write(
+                            table_name='dl1/monitoring/telescope/pedestal',
+                            containers=[event.mon.tel[tel].pedestal],
+                        )
                     clenaning_mask = event.dl1.tel[tel].image_mask
                     # Arbitrary cut, just to prevent too big showers from being used
                     # We also take only every x-th event to gain some cputime
@@ -477,14 +497,8 @@ def main():
             # Counting pedestal events in the file and skipping them for the output file
             if not source.is_simulation:
                 if event_type == 8:
-
                     n_pedestals += 1
-                    # writing pedestal info in dl1
-                    if (n_pedestals%21==20):
-                        writer._writer.write(
-                            table_name='dl1/monitoring/telescope/pedestal',
-                            containers=[event.mon.tel[tel].pedestal],
-                        )
+
                     if np.isfinite(event.dl1.tel[tel].parameters.hillas.intensity) :
                         n_pedestals_survived += 1
                     continue
