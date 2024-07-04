@@ -15,10 +15,12 @@ class sliding_pedestals:
         self.timestamps = np.array([])
         self.ped_array  = np.array([])
         self.max_array_size = max_array_size
+        self.processed_pedestals = 0
     
     def add_ped_evt(self, evt, cleaning_mask=None):
         tel = evt.sst1m.r0.tels_with_data[0]
         pedestal  = evt.sst1m.r0.tel[tel].adc_samples
+        self.processed_pedestals = self.processed_pedestals + 1
         if cleaning_mask is not None:
             pedestal[cleaning_mask] = -100 * np.ones(pedestal.shape[1])
         timestamp = evt.sst1m.r0.tel[tel].local_camera_clock/1e9
