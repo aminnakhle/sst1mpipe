@@ -37,7 +37,7 @@ For users
 
 .. code-block:: console
 
-    SST1MPIPE_VER=0.5.0
+    SST1MPIPE_VER=0.5.1
 
     wget https://github.com/SST-1M-collaboration/sst1mpipe/archive/refs/tags/v$SST1MPIPE_VER.tar.gz
     tar -xvf v$SST1MPIPE_VER.tar.gz

@@ -20,7 +20,6 @@ from .io import (
     read_charges_data,
     read_charges_mc,
     read_charge_images,
-    get_target,
     write_wr_timestamps,
     add_wr_dl1_stereo,
     load_slow_data_bias_curve,
