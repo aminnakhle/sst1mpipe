@@ -12,6 +12,7 @@ from ctapipe.instrument import SubarrayDescription
 import ctaplot
 from astropy.time import Time
 from astropy.table import Table
+from astropy.io import fits
 import astropy.constants as c
 import numpy as np
 import pandas as pd
@@ -23,6 +24,87 @@ import os
 from astroquery.simbad import Simbad
 import pkg_resources
 from os import path
+
+
+def get_target(file, force_pointing=False):
+    """
+    Extracts the target information from the string 
+    stored in the TARGET field of the input file 
+    Fits header. The string is expected to have the 
+    following format \"Target,RA[in deg],DEC[in deg]\".
+    Target may contain wobble information. Files stored 
+    during the transition between wobbles must be flagged 
+    with \'Transition\' string.
+
+    Parameters
+    ----------
+    file: string
+        Path to the raw fits data file
+    force_poiting: bool
+        If True, Transition flag is ignored and the
+        file is processed anyway
+
+    Returns
+    -------
+    target: string
+    ra: float
+        RA in degress
+    dec: float
+        DEC in degress
+    wobble: string
+
+    """
+
+    with fits.open(file) as hdul:
+
+        try:
+            header = hdul["Events"].header
+            # Delimiter should be hopefuly either ',' or '_'
+            # The string in the TARGET field is expected in the form: target[]wobble[]ra[]dec, 
+            # but targetwobble[]ra[]dec, and also target_wobble[]ra[]dec should work as well
+            pointing_string = header['TARGET']
+            logging.info('TARGET field: ' + pointing_string)
+            if pointing_string == 'Transition' and not force_pointing:
+                logging.info('Transition to the next wobble, not stable pointing direction, FILE SKIPPED.')
+                hdul.close()
+                exit()
+            if pointing_string.count('_') > 1:
+                delimiter = '_'
+            elif pointing_string.count(',') > 1:
+                delimiter = ','
+            else:
+                logging.warning('Wrong format of coordinates in the fits header, unknown delimiter')
+                target, ra, dec, wobble = None, None, None, None
+                return target, ra, dec, wobble
+
+            target = pointing_string.split(delimiter)[0]
+            try:
+                if len(pointing_string.split(delimiter)) == 4:
+                    ra = float(pointing_string.split(delimiter)[2])
+                    dec = float(pointing_string.split(delimiter)[3])
+                elif len(pointing_string.split(delimiter)) == 3:
+                    ra = float(pointing_string.split(delimiter)[1])
+                    dec = float(pointing_string.split(delimiter)[2])
+                else: 
+                    logging.warning('Wrong format of coordinates in the fits header. Field with either 3 or 4 entries is expected.')
+                    ra, dec = None, None
+            except ValueError:
+                logging.warning('Wrong format of coordinates in the fits header, cannot convert to float!')
+                ra, dec = None, None
+            if 'W1' in pointing_string:
+                wobble = 'W1'
+            elif 'W2' in pointing_string:
+                wobble = 'W2'
+            elif 'W3' in pointing_string:
+                wobble = 'W3'
+            elif 'W4' in pointing_string:
+                wobble = 'W4'
+            else: wobble = 'UNDEF'
+        except KeyError:
+            logging.warning('TARGET field is not in the fits header! Cannot read pointing RA, DEC. Are you sure that this is a valid file with science data?')
+            target, ra, dec, wobble = None, None, None, None
+    return target, ra, dec, wobble
+
 
 
 def get_nsb_levels_rates(config):
@@ -1579,3 +1661,157 @@ def get_dt_from_altaz(altaz_coord):
                            location=subarray.reference_location)
     DT = (d_tels/c.c * np.cos(tel_axis_altaz.separation( altaz_coord ))).to_value("ns")
     return DT
+    
+
+class Monitoring_R0_DL1:
+
+    """
+    Monitoring data for R0 -> DL1 processing
+
+    Attributes
+    ----------
+        pointing_ra: float
+            Pointing RA in deg
+        pointing_dec: float
+            Pointing DEC in deg
+        target: string
+            Observed source
+        force_pointing: bool
+            Pointing coordinates entered manualy 
+            (i.e. not read from the raw FITS file)
+        pointing_manual: bool
+            Pointing coordinates entered manualy 
+            (i.e. not read from the raw FITS file)
+        wobble: string
+        calibration_file: string
+            Calibration file used
+        window_file: string
+            Window file used  
+        n_saturated: int
+            Total number of saturated events in the file
+        n_pedestal: int
+            Total number of pedestal events in the file
+        n_survived_pedestals
+            Number of pedestal events which survived cleaning
+        n_triggered_tel1: int
+            Total number of TEL1 triggered events in the file
+        n_triggered_tel2: int
+            Total number of TEL2 triggered events in the file
+        swat_event_ids_used: bool
+            If true, coincident events from given night have 
+            exactly the same event ID
+    """
+
+    def __init__(self):
+        self.pointing_ra = float
+        self.pointing_dec = float
+        self.force_pointing = bool
+        self.pointing_manual = bool
+        self.output_file = str
+        self.output_file_px_charges = str
+        self.window_file = str
+        self.calibration_file = str
+        self.target = str
+        self.wobble = str
+        self.n_pedestals = 0
+        self.n_saturated = 0
+        self.n_pedestals_survived = 0
+        self.n_triggered_tel1 = 0
+        self.n_triggered_tel2 = 0
+        self.frac_rised = 0
+        self.survived_charge_fraction_1 = []
+        self.survived_charge_fraction_2 = []
+        self.swat_event_ids_used = False
+
+
+    def fill_target_info(self, input_file):
+
+        target, ra_fits, dec_fits, wobble_fits = get_target(input_file, 
+                                                            force_pointing=self.force_pointing
+                                                            )
+        self.target = target
+        self.wobble = wobble_fits
+
+        if (ra_fits is not None) & (dec_fits is not None):
+            logging.info('Pointing info from the fits file: TARGET: ' + target + ', COORDS: ' + str(ra_fits) + ' ' + str(dec_fits) + ', WOBBLE: ' + wobble_fits)
+            if self.force_pointing & (self.pointing_ra is not None) & (self.pointing_dec is not None):
+                logging.info('Using pointing info from manual input anyway (forced by user).')
+                self.pointing_manual=True
+            else:
+                self.pointing_ra = ra_fits
+                self.pointing_dec = dec_fits
+                self.output_file = self.output_file.split("_dl1.h5")[0] + "_" + wobble_fits + "_dl1.h5"
+                self.output_file_px_charges = self.output_file_px_charges.split("_pedestal_hist.h5")[0] + "_" + wobble_fits + "_pedestal_hist.h5"
+                self.pointing_manual=False
+
+        elif force_pointing & (ra is not None) & (dec is not None):
+            # Note that if there is no TARGET field in the fits file, it most probably means 
+            # that it is a file where the shifters were tuning the trigger threshold on actual nsb conditions.
+            logging.warning('No coordinates in the FITS header. Using pointing info from manual input. Are you sure that this is what you want?')
+            self.pointing_manual=True
+
+        else:
+            logging.warning('No coordinates provided, exiting...')
+            exit()
+
+
+    def count_triggered(self, event, ismc=True):
+
+        if ismc:
+            tels = event.trigger.tels_with_trigger
+            for tel in tels:
+                if tel == 1:
+                    self.n_triggered_tel1 += 1
+                elif tel == 2:
+                    self.n_triggered_tel2 += 1
+        else:
+            tel = event.sst1m.r0.tels_with_data[0]
+            if tel == 21:
+                self.n_triggered_tel1 += 1
+            elif tel == 22:
+                self.n_triggered_tel2 += 1
+
+    def count_pedestals(self, event, ismc=True):
+
+        if not ismc:
+            tel = event.sst1m.r0.tels_with_data[0]
+            event_type = event.sst1m.r0.tel[tel]._camera_event_type.value
+
+            if event_type == 8:
+                self.n_pedestals += 1
+
+                if np.isfinite(event.dl1.tel[tel].parameters.hillas.intensity) :
+                    self.n_pedestals_survived += 1
+
+    def count_survived_charge(self, event, ismc=True):
+
+        if ismc:
+            tels = event.trigger.tels_with_trigger
+            for tel in tels:
+                cleaning_mask = event.dl1.tel[tel].image_mask
+                if tel == 1:
+                    self.survived_charge_fraction_1.append(sum(event.simulation.tel[tel].true_image[cleaning_mask])/sum(event.simulation.tel[tel].true_image))
+                elif tel == 2:
+                    self.survived_charge_fraction_2.append(sum(event.simulation.tel[tel].true_image[cleaning_mask])/sum(event.simulation.tel[tel].true_image))
+                else:
+                    logging.warning('Telescope %f not recognized, survived charge fraction not logged.', tel)
+
+
+    def log_result_counts(self, ismc=True):
+
+        logging.info('Total number of TEL1 triggered events in the file: %d', 
+                    self.n_triggered_tel1)
+        logging.info('Total number of TEL2 triggered events in the file: %d', 
+                    self.n_triggered_tel2)
+        
+        if not ismc:
+            logging.info('Total number of saturated events in the file: %d', 
+                        self.n_saturated)
+            logging.info('Total number of pedestal events in the file: %d', 
+                        self.n_pedestals)
+            if self.n_pedestals > 0:
+                logging.info('Fraction of pedestal events that survived cleaning: %f', 
+                            self.n_pedestals_survived/self.n_pedestals)
+            else:
+                logging.info('No pedestal events found!')
+

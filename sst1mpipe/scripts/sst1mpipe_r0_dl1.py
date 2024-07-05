@@ -33,7 +33,8 @@ from sst1mpipe.utils import (
     get_subarray,
     image_cleaner_setup,
     swap_modules_59_88,
-    VAR_to_Idrop
+    VAR_to_Idrop,
+    Monitoring_R0_DL1
 )
 from sst1mpipe.utils.monitoring_pedestals import sliding_pedestals
 
@@ -46,7 +47,6 @@ from sst1mpipe.io import (
     write_pixel_charges_table,
     write_charge_images,
     read_charge_images,
-    get_target,
     write_wr_timestamps,
     write_charge_fraction,
     write_dl1_info
@@ -155,30 +155,31 @@ def parse_args():
     args = parser.parse_args()
     return args
 
-    
+
 def main():
 
     args = parse_args()
+    processing_info = Monitoring_R0_DL1()
 
     input_file = args.input_file
     outdir = args.outdir
-    ra = args.ra
-    dec = args.dec
+    processing_info.pointing_ra = args.ra
+    processing_info.pointing_dec = args.dec
+    processing_info.force_pointing = args.force_pointing
     pixel_charges = args.pixel_charges
-    force_pointing = args.force_pointing
     reclean = args.reclean
     precise_timestamps = args.precise_timestamps
    
     if "simtel" in input_file:
         ismc = True
-        output_file = os.path.join(outdir, input_file.split('/')[-1].rstrip(".corsika.gz.simtel.gz") + "_dl1.h5")
+        processing_info.output_file = os.path.join(outdir, input_file.split('/')[-1].rstrip(".corsika.gz.simtel.gz") + "_dl1.h5")
         output_logfile = os.path.join(outdir, input_file.split('/')[-1].rstrip(".corsika.gz.simtel.gz") + "_r1_dl1.log")
-        output_file_px_charges = os.path.join(outdir, input_file.split('/')[-1].rstrip(".corsika.gz.simtel.gz") + "_pedestal_hist.h5")
+        processing_info.output_file_px_charges = os.path.join(outdir, input_file.split('/')[-1].rstrip(".corsika.gz.simtel.gz") + "_pedestal_hist.h5")
     else:
         ismc = False
-        output_file = os.path.join(outdir, input_file.split('/')[-1].rstrip(".fits.fz") + "_dl1.h5")
+        processing_info.output_file = os.path.join(outdir, input_file.split('/')[-1].rstrip(".fits.fz") + "_dl1.h5")
         output_logfile = os.path.join(outdir, input_file.split('/')[-1].rstrip(".fits.fz") + "_r1_dl1.log")
-        output_file_px_charges = os.path.join(outdir, input_file.split('/')[-1].rstrip(".fits.fz") + "_pedestal_hist.h5")
+        processing_info.output_file_px_charges = os.path.join(outdir, input_file.split('/')[-1].rstrip(".fits.fz") + "_pedestal_hist.h5")
 
     check_outdir(outdir)
 
@@ -196,7 +197,7 @@ def main():
 
     logging.info('sst1mpipe version: %s', sst1mpipe.__version__)
     logging.info('Input file: %s', input_file)
-    logging.info('Output file: %s', output_file)
+    logging.info('Output file: %s', processing_info.output_file)
 
     max_events = None
 
@@ -241,36 +242,18 @@ def main():
 
         # Reading target name and assumed pointing ra,dec from the target field
         # of the Events fits header
-        target, ra_fits, dec_fits, wobble_fits = get_target(input_file, force_pointing=force_pointing)
-        if (ra_fits is not None) & (dec_fits is not None):
-            logging.info('Pointing info from the fits file: TARGET: ' + target + ', COORDS: ' + str(ra_fits) + ' ' + str(dec_fits) + ', WOBBLE: ' + wobble_fits)
-            if force_pointing & (ra is not None) & (dec is not None):
-                logging.info('Using pointing info from manual input anyway (forced by user).')
-                pointing_manual=True
-            else:
-                ra = ra_fits
-                dec = dec_fits
-                output_file = output_file.split("_dl1.h5")[0] + "_" + wobble_fits + "_dl1.h5"
-                output_file_px_charges = output_file_px_charges.split("_pedestal_hist.h5")[0] + "_" + wobble_fits + "_pedestal_hist.h5"
-                pointing_manual=False
-        elif force_pointing & (ra is not None) & (dec is not None):
-            # Note that if there is no TARGET field in the fits file, it most probably means 
-            # that it is a file where the shifters were tuning the trigger threshold on actual nsb conditions.
-            logging.warning('No coordinates in the FITS header. Using pointing info from manual input. Are you sure that this is what you want?')
-            pointing_manual=True
-        else:
-            logging.warning('No coordinates provided, exiting...')
-            exit()
+        processing_info.fill_target_info(input_file)
 
+        processing_info.swat_event_ids_used = source.swat_event_ids_available
         if source.swat_event_ids_available:
             logging.info('Using arrayEvtNum as event_id: input file contains SWAT array event IDs')
         else:
             logging.info('Using eventNumber as event_id: input file does not contain SWAT array event IDs')
 
     if reclean:
-        output_file = os.path.join(outdir, output_file.split('/')[-1].rstrip(".h5") + "_recleaned.h5")
+        processing_info.output_file = os.path.join(outdir, processing_info.output_file.split('/')[-1].rstrip(".h5") + "_recleaned.h5")
         input_file_px_charges = output_file_px_charges
-        output_file_px_charges = os.path.join(outdir, output_file_px_charges.split('/')[-1].rstrip(".h5") + "_recleaned.h5")
+        processing_info.output_file_px_charges = os.path.join(outdir, processing_info.output_file_px_charges.split('/')[-1].rstrip(".h5") + "_recleaned.h5")
 
     r1_dl1_calibrator = CameraCalibrator(subarray=source.subarray, config=config)
     image_processor   = image_cleaner_setup(subarray=source.subarray, config=config, ismc=ismc)
@@ -288,13 +271,6 @@ def main():
         ped_mean_charge = np.ndarray(shape=[0,3])
 
     shower_processor  = ShowerProcessor(subarray=source.subarray, config=config)
-
-    n_pedestals = 0
-    n_saturated = 0
-    n_pedestals_survived = 0
-    n_triggered_tel1 = 0
-    n_triggered_tel2 = 0
-    frac_rised = 0
 
     if pixel_charges:
         BINS = 1000
@@ -314,11 +290,8 @@ def main():
             final_histogram_tel1 = np.zeros(BINS)
             final_histogram_tel2 = np.zeros(BINS)
 
-    survived_charge_fraction_1 = []
-    survived_charge_fraction_2 = []
-
     with DataWriter(
-        source, output_path=output_file, 
+        source, output_path=processing_info.output_file, 
         overwrite        = True, 
         write_showers    = True,
         write_parameters = True,
@@ -333,7 +306,10 @@ def main():
                 if i == 0:
                     tel = event.sst1m.r0.tels_with_data[0]
                     calibrator_r0_r1 = Calibrator_R0_R1(config=config, telescope=tel)
-                    window_corr_factors, window_file = get_window_corr_factors(telescope=tel, config=config)
+                    processing_info.calibration_file = calibrator_r0_r1.calibration_file
+                    window_corr_factors, processing_info.window_file = get_window_corr_factors(
+                        telescope=tel, config=config
+                        )
                     tel_string = get_tel_string(tel, mc=False)
                     location = get_location(config=config, tel=tel_string)
 
@@ -355,12 +331,18 @@ def main():
                 # Add assumed pointing (this should be part of Event Source in the future)
                 # This stores the pointing information in the right containters. If done this way, pointing information is automaticaly propagated in
                 # the output DL1 file, in /dl1/monitoring/subarray/pointing and /dl1/monitoring/telescope/pointing/TEL
-                event = add_pointing_to_events(event, ra=ra, dec=dec, telescope=tel, location=location)
+                event = add_pointing_to_events(
+                                                event, 
+                                                ra=processing_info.pointing_ra, 
+                                                dec=processing_info.pointing_dec, 
+                                                telescope=tel, 
+                                                location=location
+                                                )
 
                 # Adding event_id and obs_id in event.index
                 # event_id is in event.sst1m.r0.event_id, but obs_id must be made up
                 # SHOULD BE REMOVED as soon as event source can handle this
-                event = add_event_id(event, filename=output_file, event_number=i)
+                event = add_event_id(event, filename=processing_info.output_file, event_number=i)
 
                 # Here we swap two wrongly connected modules in tel2 after 
                 # camera refurbishment in 2023. Only R1 waveforms are swapped.
@@ -387,17 +369,14 @@ def main():
                 image_processor.clean.nsb_level = meanQ
                 image_processor.clean.config = config['ImageProcessor'][cleaner]
                 ped_mean_charge = np.append(ped_mean_charge, [[event.index.obs_id, event.index.event_id, meanQ]], axis=0)
+                processing_info.frac_rised += image_processor.clean.frac_rised
 
-            r1_dl1_calibrator(event) # r1->dl1a (images, peak times)
-
-            if reclean and (len(dl1_charges) > 0):
-                frac_rised += image_processor.clean.frac_rised
+            r1_dl1_calibrator(event) # r1->dl1a (images, peak times)                
 
             if not source.is_simulation:
 
                 # Integration correction of saturated pixels
-                event, saturated = saturated_charge_correction(event)
-                if saturated: n_saturated += 1
+                event = saturated_charge_correction(event, processing_info=processing_info)
 
                 event = window_transmittance_correction(
                     event, 
@@ -421,8 +400,6 @@ def main():
 
                     pedestal_info.add_ped_evt(event)
                     pedestal_info.fill_mon_container(event)
-
-
 
                 elif not pedestals_in_file:
                     # writing pedestal info in dl1
@@ -483,39 +460,17 @@ def main():
             shower_processor(event) # dl1b->dl2 (reconstruction of stereo parameters, also energy/direction/classification in the future versions of ctapipe)
             
             # Counting all triggered events
-            if source.is_simulation:
-                tels = event.trigger.tels_with_trigger
-                for tel in tels:
-                    if tel == 1:
-                        n_triggered_tel1 += 1
-                    elif tel == 2:
-                        n_triggered_tel2 += 1
-            else:
-                if tel == 21:
-                    n_triggered_tel1 += 1
-                elif tel == 22:
-                    n_triggered_tel2 += 1
+            processing_info.count_triggered(event, ismc=source.is_simulation)
 
             # Counting pedestal events in the file and skipping them for the output file
-            if not source.is_simulation:
-                if event_type == 8:
-                    n_pedestals += 1
+            processing_info.count_pedestals(event, ismc=source.is_simulation)
 
-                    if np.isfinite(event.dl1.tel[tel].parameters.hillas.intensity) :
-                        n_pedestals_survived += 1
-                    continue
+            # skip rest of the script for pedestal events
+            if event_type == 8:
+                continue
 
             # Calculation of fraction of true charge which survived cleaning
-            if source.is_simulation:
-                tels = event.trigger.tels_with_trigger
-                for tel in tels:
-                    cleaning_mask = event.dl1.tel[tel].image_mask
-                    if tel == 1:
-                        survived_charge_fraction_1.append(sum(event.simulation.tel[tel].true_image[cleaning_mask])/sum(event.simulation.tel[tel].true_image))
-                    elif tel == 2:
-                        survived_charge_fraction_2.append(sum(event.simulation.tel[tel].true_image[cleaning_mask])/sum(event.simulation.tel[tel].true_image))
-                    else:
-                        logging.warning('Telescope %f not recognized, survived charge fraction not logged.', tel)
+            processing_info.count_survived_charge(event, ismc=source.is_simulation)
 
             ## Correct (or not) the Voltage drop effect : Global correction on the intensity
             ## apply (or not) some absolute correction on the intensity
@@ -548,41 +503,36 @@ def main():
     # NOTE: unfortunately using this, units in all columns have to be dropped, because otherwise ctapipe merging tool fails.
     # I didn't find a solution, this should definitely be revisited!
     if reclean and (len(dl1_charges) > 0):
-        write_extra_parameters(output_file, config=config, ismc=ismc, meanQ=ped_mean_charge)
+        write_extra_parameters(processing_info.output_file, config=config, ismc=ismc, meanQ=ped_mean_charge)
     else:
-        write_extra_parameters(output_file, config=config, ismc=ismc)
+        write_extra_parameters(processing_info.output_file, config=config, ismc=ismc)
 
     if source.is_simulation:
         write_charge_fraction(
-            output_file, 
+            processing_info.output_file, 
             survived_charge={
-                "tel_001": survived_charge_fraction_1, 
-                "tel_002": survived_charge_fraction_2
+                "tel_001": processing_info.survived_charge_fraction_1, 
+                "tel_002": processing_info.survived_charge_fraction_2
                 }
             )
 
     # Write WR timestamps with high numerical precision
     if not source.is_simulation and precise_timestamps:
-        write_wr_timestamps(output_file, event_source=SST1MEventSource([input_file], max_events=max_events))
+        write_wr_timestamps(processing_info.output_file, 
+                            event_source=SST1MEventSource([input_file], 
+                            max_events=max_events)
+                            )
 
     # Write pointing information in the main DL1 table for convenience
     if not source.is_simulation:
-        write_assumed_pointing(output_file, config=config, pointing_ra=ra, pointing_dec=dec)
+        write_assumed_pointing(processing_info, config=config)
 
-    logging.info('Total number of TEL1 triggered events in the file: %d', n_triggered_tel1)
-    logging.info('Total number of TEL2 triggered events in the file: %d', n_triggered_tel2)
-
-    if not source.is_simulation:
-        logging.info('Total number of saturated events in the file: %d', n_saturated)
-        logging.info('Total number of pedestal events in the file: %d', n_pedestals)
-        if n_pedestals > 0:
-            logging.info('Fraction of pedestal events that survived cleaning: %f', n_pedestals_survived/n_pedestals)
-        else:
-            logging.info('No pedestal events found!')
-
+    # Logging all event counts
+    processing_info.log_result_counts(ismc=source.is_simulation)
+    
     if reclean and (len(dl1_charges) > 0):
-            logging.info('Average (per event) fraction of pixels (N/1296) with raised picture threshold: %f', frac_rised/i)
-
+        logging.info('Average (per event) fraction of pixels (N/1296) with raised picture threshold: %f', processing_info.frac_rised/i)
+        
     if source.is_simulation:
         # Cut on minimum mc_energy in the output file, which is needed if we want to safely combine MC from different productions
         # NOTE: This doesn't change the mc and histogram tab in the output files and this must be taken care of in performance
@@ -590,29 +540,8 @@ def main():
         # lead to an error of the order of 10%.
         energy_min_cut(output_file, config=config)
 
-    if source.is_simulation:
-        write_dl1_info(
-            output_file,
-            n_triggered_tel1=n_triggered_tel1,
-            n_triggered_tel2=n_triggered_tel2
-        )
-    else:
-        write_dl1_info(
-            output_file, 
-            target=target,
-            ra=ra,
-            dec=dec,
-            manual_coords=pointing_manual,
-            wobble=wobble_fits,
-            calib_file=calibrator_r0_r1.calibration_file, 
-            window_file=window_file, 
-            n_saturated=n_saturated, 
-            n_pedestal=n_pedestals, 
-            n_survived_pedestals=n_pedestals_survived,
-            n_triggered_tel1=n_triggered_tel1,
-            n_triggered_tel2=n_triggered_tel2,
-            swat_event_ids_used=source.swat_event_ids_available
-            )
+    # write all processing monitoring information
+    write_dl1_info(processing_info)
 
     # We write calibration configuration in the output file
     # NOTE: If one use the ctapipe merging tool this table is missing in the merged DL1 file!
@@ -632,7 +561,7 @@ def main():
                 if (N_events > 0):
                     data = np.array(final_histogram)[..., np.newaxis]
                     names = ['pixel_charge']
-                    write_charge_images(ped_q_map, output_file=output_file_px_charges)
+                    write_charge_images(ped_q_map, output_file=processing_info.output_file_px_charges)
             else:
                 logging.warning('There are no pedestal events in the file to calculate pixel charges distributions.')
         else:
@@ -641,7 +570,7 @@ def main():
                 names = ['pixel_charge_tel1', 'pixel_charge_tel2']
         
         if (N_events > 0) or ((N_events_tel1 > 0) and (N_events_tel2 > 0)):
-            write_pixel_charges_table(data, bin_edges, names=names, output_file=output_file_px_charges)
+            write_pixel_charges_table(data, bin_edges, names=names, output_file=processing_info.output_file_px_charges)
         else:
             logging.warning('There are no pedestal events in the file to fill the pixels charge histogram.')
 

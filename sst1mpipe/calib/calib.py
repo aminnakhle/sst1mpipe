@@ -126,7 +126,7 @@ def window_transmittance_correction(
     return event
 
 
-def saturated_charge_correction(event):
+def saturated_charge_correction(event, processing_info=None):
     """
     Finds saturated waveforms and applies different peak integration on
     them, as the standard one does not perform well in such cases. This
@@ -143,9 +143,7 @@ def saturated_charge_correction(event):
     -------
     event:
         sst1mpipe.io.containers.SST1MArrayEventContainer
-    saturated: bool
-        True if integration correction was applied on at least 
-        one pixel waveform
+
     """
 
     saturated_threshold = 3000
@@ -203,8 +201,9 @@ def saturated_charge_correction(event):
         if saturated:
             event.dl1.tel[telescope].image = image_new
             event.dl1.tel[telescope].peak_time = peaktime_new
+            processing_info.n_saturated += 1
 
-    return event, saturated
+    return event
 
 
 class Calibrator_R0_R1:
