@@ -893,8 +893,9 @@ def remove_bad_pixels(event, config=None):
                     mask_bad[config["analysis"]["bad_pixels"][tel_name]] = 1
                     mask_bad = mask_bad.astype(bool)
 
-                    event.r0.tel[tel].waveform[0][mask_bad] = np.zeros(50)
-                    event.r1.tel[tel].waveform[mask_bad] = np.zeros(50)
+                    N_samples = event.r0.tel[tel].waveform[0].shape[1]
+                    event.r0.tel[tel].waveform[0][mask_bad] = np.zeros(N_samples)
+                    event.r1.tel[tel].waveform[mask_bad] = np.zeros(N_samples)
                     event.simulation.tel[tel].true_image[mask_bad] = 0
                     event.mon.tel[tel].pixel_status['hardware_failing_pixels'] = np.array([mask_bad])
                     event.mon.tel[tel].pixel_status['flatfield_failing_pixels'] = np.array([mask_bad])
