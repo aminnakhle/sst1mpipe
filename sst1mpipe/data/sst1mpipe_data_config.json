@@ -18,7 +18,9 @@
 
     "telescope_calibration": {
       "tel_021": null,
-      "tel_022": null
+      "tel_022": null,
+      "bad_calib_px_interpolation": true,
+      "dynamic_dead_px_interpolation": true
     },
     "swap_modules_59_88": {
       "tel_021": false,
