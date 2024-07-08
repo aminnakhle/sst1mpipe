@@ -237,7 +237,14 @@ class Calibrator_R0_R1:
         self.telescope = telescope
         self.config = config
         self.mask_bad = np.array([])
-        self.pixels_removed = int
+        self.pixels_removed = 0
+
+        if self.config["telescope_calibration"]["bad_calib_px_interpolation"]:
+            logging.info("Charge in pixels with bad calibration parameters are interpolated.")
+            if self.config["telescope_calibration"]["dynamic_dead_px_interpolation"]:
+                logging.info("Charge in dead pixels are interpolated (if pedestal info is provided).")
+        else:
+            logging.info("No pixel charge interpolation is applied. Gain in pixels with wrong calibration is calcualted as a global average of all gains.")
 
         # get calibration parameters during initialization
         self.get_calibration_parameters()
@@ -272,7 +279,7 @@ class Calibrator_R0_R1:
             VI = VAR_to_Idrop(pedestal_info.get_charge_std()**2, self.telescope)
         else:
             VI = 1.0
-            
+
         event.r1.tel[self.telescope].waveform = (baseline_subtracted / self.dc_to_pe / VI ).T
 
         # This function removes bad pixels 
@@ -280,7 +287,8 @@ class Calibrator_R0_R1:
         # - based on pedestal variation, i.e. dynamicaly
         # Charges in these pixels are then interpolated using method set in cfg: invalid_pixel_handler_type
         # Default is NeighborAverage, but can be turned off with 'null'
-        event = self.remove_bad_pixels_calib(event, pedestal_info=pedestal_info)
+        if self.config["telescope_calibration"]["bad_calib_px_interpolation"]:
+            event = self.remove_bad_pixels_calib(event, pedestal_info=pedestal_info)
 
         return event
 
@@ -346,6 +354,7 @@ class Calibrator_R0_R1:
         self.dc_to_pe = np.array(self.calibration_parameters['dc_to_pe']) 
         # masking pixels with bad calibration parameters
         self.mask_bad = self.calibration_parameters['calib_flag'] != 1
+        self.dc_to_pe[self.mask_bad] = self.dc_to_pe[~self.mask_bad].mean()
 
 
     def remove_bad_pixels_calib(self, event, pedestal_info=None):
@@ -373,7 +382,7 @@ class Calibrator_R0_R1:
         mask_bad_calib = self.mask_bad.astype(bool)
 
         # masking pixels with too low baseline std
-        if pedestal_info is not None:
+        if pedestal_info is not None and self.config["telescope_calibration"]["dynamic_dead_px_interpolation"]:
             mask_bad_std = pedestal_info.get_charge_std() < 2.5
             mask_bad = mask_bad_calib + mask_bad_std
         else:

@@ -388,6 +388,8 @@ def main():
 
             ## Fill monitoring container with baseline info :
             if not source.is_simulation:
+                if not bool(i % 100) and config["telescope_calibration"]["bad_calib_px_interpolation"]:
+                    logging.info("N pixels interpolated (every 100th event): %d", calibrator_r0_r1.pixels_removed)
                 if event_type==8:
                     # writing pedestal info in dl1
                     if ( (pedestal_info.processed_pedestals !=0) and \
