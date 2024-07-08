@@ -389,8 +389,9 @@ class Calibrator_R0_R1:
             mask_bad = mask_bad_calib
         self.pixels_removed = sum(mask_bad)
 
-        event.r0.tel[self.telescope].waveform[0][mask_bad] = np.zeros(50)
-        event.r1.tel[self.telescope].waveform[mask_bad] = np.zeros(50)
+        N_samples = event.r0.tel[self.telescope].waveform[0].shape[1]
+        event.r0.tel[self.telescope].waveform[0][mask_bad] = np.zeros(N_samples)
+        event.r1.tel[self.telescope].waveform[mask_bad] = np.zeros(N_samples)
         event.mon.tel[self.telescope].pixel_status['hardware_failing_pixels'] = np.array([mask_bad])
         event.mon.tel[self.telescope].pixel_status['flatfield_failing_pixels'] = np.array([mask_bad])
         event.mon.tel[self.telescope].pixel_status['pedestal_failing_pixels'] = np.array([mask_bad])
