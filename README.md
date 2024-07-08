@@ -34,11 +34,11 @@ bash Mambaforge-$(uname)-$(uname -m).sh
 
 
 ### For users
-- download stable version of <b>sst1mpipe</b> (latest version = 0.5.1)
+- download stable version of <b>sst1mpipe</b> (latest version = 0.5.2)
 - create and activate <b>conda</b> environment
 - install <b>sst1mpipe</b>
 ```
-SST1MPIPE_VER=0.5.1
+SST1MPIPE_VER=0.5.2
 
 wget https://github.com/SST-1M-collaboration/sst1mpipe/archive/refs/tags/v$SST1MPIPE_VER.tar.gz
 tar -xvf v$SST1MPIPE_VER.tar.gz
