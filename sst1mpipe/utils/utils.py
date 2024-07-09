@@ -64,8 +64,9 @@ def get_target(file, force_pointing=False):
             # but targetwobble[]ra[]dec, and also target_wobble[]ra[]dec should work as well
             pointing_string = header['TARGET']
             logging.info('TARGET field: ' + pointing_string)
-            if pointing_string == 'Transition' and not force_pointing:
-                logging.info('Transition to the next wobble, not stable pointing direction, FILE SKIPPED.')
+            targets_to_skip = ['transition', 'Transition', 'TRANSITION', 'Dark', 'DARK', 'dark']
+            if pointing_string in targets_to_skip and not force_pointing:
+                logging.info('Transition to the next wobble, or dark file, not on-source pointing direction, FILE SKIPPED.')
                 hdul.close()
                 exit()
             if pointing_string.count('_') > 1:

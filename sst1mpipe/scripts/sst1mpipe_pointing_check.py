@@ -30,7 +30,7 @@ from ctapipe.instrument import SubarrayDescription
 
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
 
-from sst1mpipe.io import get_target
+from sst1mpipe.utils import get_target
 
 from sst1mpipe.utils import (
     simbad_query,

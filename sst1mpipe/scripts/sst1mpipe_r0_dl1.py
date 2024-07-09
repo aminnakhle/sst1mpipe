@@ -213,32 +213,11 @@ def main():
         source = SST1MEventSource([input_file], max_events=max_events)
         source._subarray = get_subarray()
 
-        ## init pedestal_info and loading first pedestal events in pedestal_info
-        pedestal_info = sliding_pedestals()
-        pedestal_info.load_firsts_pedestals(input_file)
-        if pedestal_info.get_n_events() == 0:
-            logging.warning("No pedestal events found in firsts events. Cleaned shower/NSB events used instead.")
-            pedestal_info.load_firsts_fake_pedestals(input_file, config=config)
-            logging.info("{} fake pedestals events loaded in buffer".format(pedestal_info.get_n_events()))
-            pedestals_in_file = False
-        else:
-            logging.info("{} pedestals events loaded in buffer".format(pedestal_info.get_n_events()))
-            pedestals_in_file = True
-
         logging.info("Tel 1 Intensity correction factor: {}".format(config['NsbCalibrator']['intensity_correction']['tel_021']))
         logging.info("Tel 2 Intensity correction factor: {}".format(config['NsbCalibrator']['intensity_correction']['tel_022']))
 
-        if config['NsbCalibrator']['apply_pixelwise_Vdrop_correction']:
-            logging.info("Voltage drop correction is applyed pixelwise")
-
-        if config['NsbCalibrator']['apply_global_Vdrop_correction']:
-            logging.info("Voltage drop correction is applyed globaly")
-
-        if config['NsbCalibrator']['apply_global_Vdrop_correction'] == config['NsbCalibrator']['apply_pixelwise_Vdrop_correction']:
-            if config['NsbCalibrator']['apply_global_Vdrop_correction']:
-                logging.error("Voltage drop correction is applyed 2 times!!! this is WRONG!")
-            else:
-                logging.warning("NO Voltage drop correction is applyed")
+        ## init pedestal_info and loading first pedestal events in pedestal_info
+        pedestal_info = sliding_pedestals(input_file=input_file, config=config)
 
         # Reading target name and assumed pointing ra,dec from the target field
         # of the Events fits header
@@ -403,7 +382,7 @@ def main():
                     pedestal_info.add_ped_evt(event)
                     pedestal_info.fill_mon_container(event)
 
-                elif not pedestals_in_file:
+                elif not pedestal_info.pedestals_in_file:
                     # writing pedestal info in dl1
                     if ( (pedestal_info.processed_pedestals !=0) and \
                          (pedestal_info.processed_pedestals%20 == 0)):
