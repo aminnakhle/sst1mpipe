@@ -52,8 +52,7 @@ from .utils import (
     get_target,
     get_GTIs,
     get_pointing_radec,
-    swap_modules_59_88,
-    Monitoring_R0_DL1
+    swap_modules_59_88
 )
 
 from .cleaning import (
