@@ -33,10 +33,10 @@ from sst1mpipe.utils import (
     get_subarray,
     image_cleaner_setup,
     swap_modules_59_88,
-    VAR_to_Idrop,
-    Monitoring_R0_DL1
+    VAR_to_Idrop
 )
 from sst1mpipe.utils.monitoring_pedestals import sliding_pedestals
+from sst1mpipe.utils.monitoring_r0_dl1 import Monitoring_R0_DL1
 
 from sst1mpipe.io import (
     write_extra_parameters,
@@ -161,8 +161,8 @@ def main():
     args = parse_args()
     processing_info = Monitoring_R0_DL1()
 
-    input_file = args.input_file
     outdir = args.outdir
+    processing_info.input_file = args.input_file
     processing_info.pointing_ra = args.ra
     processing_info.pointing_dec = args.dec
     processing_info.force_pointing = args.force_pointing
@@ -170,16 +170,16 @@ def main():
     reclean = args.reclean
     precise_timestamps = args.precise_timestamps
    
-    if "simtel" in input_file:
-        ismc = True
-        processing_info.output_file = os.path.join(outdir, input_file.split('/')[-1].rstrip(".corsika.gz.simtel.gz") + "_dl1.h5")
+    ismc = processing_info.guess_mc()
+
+    if ismc:
+        processing_info.output_file = os.path.join(outdir,  processing_info.input_file.split('/')[-1].rstrip(".corsika.gz.simtel.gz") + "_dl1.h5")
         output_logfile = os.path.join(outdir, input_file.split('/')[-1].rstrip(".corsika.gz.simtel.gz") + "_r1_dl1.log")
         processing_info.output_file_px_charges = os.path.join(outdir, input_file.split('/')[-1].rstrip(".corsika.gz.simtel.gz") + "_pedestal_hist.h5")
     else:
-        ismc = False
-        processing_info.output_file = os.path.join(outdir, input_file.split('/')[-1].rstrip(".fits.fz") + "_dl1.h5")
-        output_logfile = os.path.join(outdir, input_file.split('/')[-1].rstrip(".fits.fz") + "_r1_dl1.log")
-        processing_info.output_file_px_charges = os.path.join(outdir, input_file.split('/')[-1].rstrip(".fits.fz") + "_pedestal_hist.h5")
+        processing_info.output_file = os.path.join(outdir,  processing_info.input_file.split('/')[-1].rstrip(".fits.fz") + "_dl1.h5")
+        output_logfile = os.path.join(outdir,  processing_info.input_file.split('/')[-1].rstrip(".fits.fz") + "_r1_dl1.log")
+        processing_info.output_file_px_charges = os.path.join(outdir,  processing_info.input_file.split('/')[-1].rstrip(".fits.fz") + "_pedestal_hist.h5")
 
     check_outdir(outdir)
 
@@ -196,7 +196,7 @@ def main():
     )
 
     logging.info('sst1mpipe version: %s', sst1mpipe.__version__)
-    logging.info('Input file: %s', input_file)
+    logging.info('Input file: %s',  processing_info.input_file)
     logging.info('Output file: %s', processing_info.output_file)
 
     max_events = None
@@ -204,24 +204,24 @@ def main():
     config = load_config(args.config_file, ismc=ismc)
 
     if ismc:
-        source = EventSource(input_file, max_events=max_events, allowed_tels=config["allowed_tels"])
+        source = EventSource( processing_info.input_file, max_events=max_events, allowed_tels=config["allowed_tels"])
 
         logging.info("Tel 1 Intensity correction factor: {}".format(config['NsbCalibrator']['intensity_correction']['tel_001']))
         logging.info("Tel 2 Intensity correction factor: {}".format(config['NsbCalibrator']['intensity_correction']['tel_002']))
 
     else:
-        source = SST1MEventSource([input_file], max_events=max_events)
+        source = SST1MEventSource([ processing_info.input_file], max_events=max_events)
         source._subarray = get_subarray()
 
         logging.info("Tel 1 Intensity correction factor: {}".format(config['NsbCalibrator']['intensity_correction']['tel_021']))
         logging.info("Tel 2 Intensity correction factor: {}".format(config['NsbCalibrator']['intensity_correction']['tel_022']))
 
         ## init pedestal_info and loading first pedestal events in pedestal_info
-        pedestal_info = sliding_pedestals(input_file=input_file, config=config)
+        pedestal_info = sliding_pedestals(input_file=processing_info.input_file, config=config)
 
         # Reading target name and assumed pointing ra,dec from the target field
         # of the Events fits header
-        processing_info.fill_target_info(input_file)
+        processing_info.fill_target_info()
 
         processing_info.swat_event_ids_used = source.swat_event_ids_available
         if source.swat_event_ids_available:
@@ -231,7 +231,7 @@ def main():
 
     if reclean:
         processing_info.output_file = os.path.join(outdir, processing_info.output_file.split('/')[-1].rstrip(".h5") + "_recleaned.h5")
-        input_file_px_charges = output_file_px_charges
+        input_file_px_charges = processing_info.output_file_px_charges
         processing_info.output_file_px_charges = os.path.join(outdir, processing_info.output_file_px_charges.split('/')[-1].rstrip(".h5") + "_recleaned.h5")
 
     r1_dl1_calibrator = CameraCalibrator(subarray=source.subarray, config=config)
@@ -444,7 +444,8 @@ def main():
             processing_info.count_triggered(event, ismc=source.is_simulation)
 
             # Counting pedestal events in the file and skipping them for the output file
-            processing_info.count_pedestals(event, ismc=source.is_simulation)
+            if not ismc:
+                processing_info.count_pedestals(event)
 
             # skip rest of the script for pedestal events
             if event_type == 8:
@@ -500,7 +501,7 @@ def main():
     # Write WR timestamps with high numerical precision
     if not source.is_simulation and precise_timestamps:
         write_wr_timestamps(processing_info.output_file, 
-                            event_source=SST1MEventSource([input_file], 
+                            event_source=SST1MEventSource([processing_info.input_file], 
                             max_events=max_events)
                             )
 
