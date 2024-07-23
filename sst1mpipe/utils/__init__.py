@@ -63,9 +63,9 @@ from .NSB_tools import (
     VAR_to_shift,
     VAR_to_Idrop,
     VAR_to_NSB,
-    get_optical_eff_shift,
     get_simple_nsbrate,
-    gain_drop_th
+    gain_drop_th,
+    VAR_to_NSB_photon_rate
     )
 
 #from .monitoring_pedestals import (
