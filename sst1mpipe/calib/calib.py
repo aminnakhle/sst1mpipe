@@ -72,34 +72,14 @@ def get_window_corr_factors(telescope=None, config=None):
         logging.info("NO WINDOW TRANSMITTANCE FILE FOR TELESCOPE %s FOUND IN THE CFG FILE, DEFAULT WINDOW USED.", telescope)
         window_corr, window_file = get_default_window(telescope=telescope)
 
-    # Correct for wrongly mapped pixels
-    tel_string = get_tel_string(telescope, mc=False)
-    if config['swap_modules_59_88'][tel_string]:
-        # module 59
-        mask59 = np.zeros(1296, dtype=bool)
-        mask59[1029] = True
-        mask59[1098:1102+1] = True
-        mask59[1133:1134+1] = True
-        mask59[1064:1067+1] = True
-        window_corr_59 = window_corr[mask59]
-        
-        # module 88
-        mask88 = np.zeros(1296, dtype=bool)
-        mask88[1103] = True
-        mask88[1165:1169+1] = True
-        mask88[1194:1195+1] = True
-        mask88[1135:1138+1] = True
-        window_corr_88 = window_corr[mask88]
-        
-        window_corr[mask59] = window_corr_88
-        window_corr[mask88] = window_corr_59  
-
     return window_corr, window_file
 
 
 def window_transmittance_correction(
         event, window_corr_factors=None, 
-        telescope=None):
+        telescope=None,
+        swap_flag=False
+        ):
     """
     Applies window transmittance correction 
     on the integrated waveforms (images)
@@ -112,6 +92,9 @@ def window_transmittance_correction(
     telescope: int
         Telescope number as in
         event.sst1m.r0.tels_with_data
+    swap_flag: bool
+        Swap (or not) window correction
+        in wrongly connected pixels
 
     Returns
     -------
@@ -119,6 +102,27 @@ def window_transmittance_correction(
         sst1mpipe.io.containers.SST1MArrayEventContainer
 
     """
+
+    if swap_flag:
+
+        # module 59
+        mask59 = np.zeros(1296, dtype=bool)
+        mask59[1029] = True
+        mask59[1098:1102+1] = True
+        mask59[1133:1134+1] = True
+        mask59[1064:1067+1] = True
+        window_corr_59 = window_corr_factors[mask59]
+        
+        # module 88
+        mask88 = np.zeros(1296, dtype=bool)
+        mask88[1103] = True
+        mask88[1165:1169+1] = True
+        mask88[1194:1195+1] = True
+        mask88[1135:1138+1] = True
+        window_corr_88 = window_corr_factors[mask88]
+        
+        window_corr_factors[mask59] = window_corr_88
+        window_corr_factors[mask88] = window_corr_59  
 
     image_corrected = event.dl1.tel[telescope].image / window_corr_factors
     event.dl1.tel[telescope].image = image_corrected.astype(np.float32) 
