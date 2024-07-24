@@ -22,10 +22,6 @@
       "bad_calib_px_interpolation": true,
       "dynamic_dead_px_interpolation": true
     },
-    "swap_modules_59_88": {
-      "tel_021": false,
-      "tel_022": true
-    },
 
     "window_transmittance": {
       "tel_021": null,

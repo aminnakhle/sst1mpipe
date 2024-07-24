@@ -33,7 +33,8 @@ from sst1mpipe.utils import (
     get_subarray,
     image_cleaner_setup,
     swap_modules_59_88,
-    VAR_to_Idrop
+    VAR_to_Idrop,
+    get_swap_flag
 )
 from sst1mpipe.utils.monitoring_pedestals import sliding_pedestals
 from sst1mpipe.utils.monitoring_r0_dl1 import Monitoring_R0_DL1
@@ -291,9 +292,7 @@ def main():
                         )
                     tel_string = get_tel_string(tel, mc=False)
                     location = get_location(config=config, tel=tel_string)
-
-                    if config['swap_modules_59_88'][tel_string]:
-                        logging.info('Swapping wrongly connected modules 59 and 88 for ' + tel_string)
+                    swap_modules = get_swap_flag(event)
 
                 event.trigger.tels_with_trigger = [tel]
 
@@ -325,8 +324,9 @@ def main():
 
                 # Here we swap two wrongly connected modules in tel2 after 
                 # camera refurbishment in 2023. Only R1 waveforms are swapped.
-                if config['swap_modules_59_88'][tel_string]:
-                    event = swap_modules_59_88(event, tel=tel)
+                # The modules were physicaly reconnected in July 2024, so no swapping
+                # after this date (authomatic)
+                event = swap_modules_59_88(event, tel=tel, swap_flag=swap_modules)
 
             # For an unknown reason, event.simulation.tel[tel].true_image is sometime None, which kills the rest of the script
             # and simulation histogram is not saved. Here we repace it with an array of zeros.
@@ -360,7 +360,8 @@ def main():
                 event = window_transmittance_correction(
                     event, 
                     window_corr_factors=window_corr_factors, 
-                    telescope=tel
+                    telescope=tel,
+                    swap_flag=swap_modules
                     )
 
             image_processor(event) # dl1a->dl1b (hillas parameters)

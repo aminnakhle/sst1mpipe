@@ -820,11 +820,47 @@ def correct_true_image(event):
     return event
 
 
-def swap_modules_59_88(event, tel=None):
+def get_swap_flag(event):
+    """
+    Correct for wrongly mapped pixels of tel2 between
+    camera refurbishment in September 2023 and physical 
+    repair in July 2024. 
+
+    Parameters
+    ----------
+    event:
+        sst1mpipe.io.containers.SST1MArrayEventContainer
+
+    Returns
+    -------
+    bool:
+        Swap (or not) R1 waveforms and window corrections
+        in wrongly connected pixels
+
+    """
+
+    tel = event.sst1m.r0.tels_with_data[0]
+    flag = False
+
+    if tel == 22:
+        localtime = event.sst1m.r0.tel[tel].local_camera_clock/1e9
+        time = Time(localtime, format='unix_tai')
+        time_min = Time('2023-09-01T00:00:00.000', format='isot', scale='utc')
+        time_max = Time('2024-07-18T00:00:00.000', format='isot', scale='utc')
+
+        if (time > time_min) and (time < time_max):
+            flag = True
+            logging.info('Data on tel ' + str(tel) + ' taken between Sep 2023 and Jul 2024, swapping wrongly connected modules 59 and 88.')
+
+    return flag
+
+
+def swap_modules_59_88(event,tel=None, swap_flag=False):
     """
     Swaps pixel R1 waveforms in two wrongly
-    connected modules of tel2 after camera refurbishment
-    in 2023. Pixel numbering is based on 
+    connected modules of tel2 between camera refurbishment
+    in September 2023 and physical repair in July 2024. 
+    Pixel numbering is based on 
     test/resources/camera_config.cfg
 
     Parameters
@@ -832,6 +868,9 @@ def swap_modules_59_88(event, tel=None):
     event:
         sst1mpipe.io.containers.SST1MArrayEventContainer
     tel: int
+    swap_flag: bool
+        Swap (or not) R1 waveforms
+        in wrongly connected pixels
 
     Returns
     -------
@@ -840,24 +879,26 @@ def swap_modules_59_88(event, tel=None):
 
     """
 
-    # module 59
-    mask59 = np.zeros(1296, dtype=bool)
-    mask59[1029] = True
-    mask59[1098:1102+1] = True
-    mask59[1133:1134+1] = True
-    mask59[1064:1067+1] = True
-    waveform_59 = event.r1.tel[tel].waveform[mask59, :]
-    
-    # module 88
-    mask88 = np.zeros(1296, dtype=bool)
-    mask88[1103] = True
-    mask88[1165:1169+1] = True
-    mask88[1194:1195+1] = True
-    mask88[1135:1138+1] = True
-    waveform_88 = event.r1.tel[tel].waveform[mask88, :]
-    
-    event.r1.tel[tel].waveform[mask59] = waveform_88
-    event.r1.tel[tel].waveform[mask88] = waveform_59   
+    if swap_flag:
+
+        # module 59
+        mask59 = np.zeros(1296, dtype=bool)
+        mask59[1029] = True
+        mask59[1098:1102+1] = True
+        mask59[1133:1134+1] = True
+        mask59[1064:1067+1] = True
+        waveform_59 = event.r1.tel[tel].waveform[mask59, :]
+        
+        # module 88
+        mask88 = np.zeros(1296, dtype=bool)
+        mask88[1103] = True
+        mask88[1165:1169+1] = True
+        mask88[1194:1195+1] = True
+        mask88[1135:1138+1] = True
+        waveform_88 = event.r1.tel[tel].waveform[mask88, :]
+        
+        event.r1.tel[tel].waveform[mask59] = waveform_88
+        event.r1.tel[tel].waveform[mask88] = waveform_59   
 
     return event
 
