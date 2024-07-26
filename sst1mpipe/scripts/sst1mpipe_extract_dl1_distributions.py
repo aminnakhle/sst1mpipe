@@ -109,6 +109,10 @@ def main():
         files = glob.glob(data_path_dl1 + '/*dl1.h5')
     if len(files) == 0:
         files = glob.glob(data_path_dl1 + '/*dl1_recleaned.h5')
+
+    if len(files) == 0:
+        files = glob.glob(data_path_dl1 + '/*dl2.h5')
+
     files.sort()
     
     # Sometimes first few files are broken

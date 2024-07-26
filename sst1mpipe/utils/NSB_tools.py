@@ -13,6 +13,8 @@ import astropy
 from scipy import interpolate
 
 import matplotlib.pyplot as plt 
+from sst1mpipe.io.sst1m_event_source import SST1MEventSource
+
 
 ## spline aprox NSB : VAR[ADC]->SHIFT[ADC]
 ## these are rough aprox.. To be updated!
@@ -65,11 +67,12 @@ def NSB_to_BLS(NSB_MHz,ntel):
     A = NSB_MHz*Gain_0['tel{}'.format(ntel)]*BINWIDTH
     return A/(1-Vdrop_lin_aprox['gain_tel{}'.format(ntel)]*A)
 
-def make_drop_func(param_name,itel):
+def make_drop_func(param_name,ntel):
     
     def drop_func(B_shift):
         slope   = Vdrop_lin_aprox[param_name+'_tel{}'.format(ntel)]
-        return max(slope*B_shift+1, 0)
+        #return max(slope*B_shift+1, 0)
+        return slope*B_shift+1
     return drop_func
 
 def VAR_to_Idrop(baseline_VAR,ntel):
@@ -94,9 +97,9 @@ def VAR_to_Gdrop(baseline_VAR,ntel):
     return VAR_to_shift(baseline_VAR,ntel)*slope+1
 
 
-def get_simple_nsbrate(bs_shift,gain,binlenght=4*u.ns):
+def get_simple_nsbrate(bs_shift,gain,binlenght=4e-3):
     rate = bs_shift/gain / binlenght
-    return rate.to('MHz')
+    return rate
 
 def gain_drop_th(nsb_rate, cell_capacitance=85. * u.fF, bias_resistance=2.4 * u.kohm):
     return 1 - 1 / (1 + (nsb_rate * cell_capacitance * bias_resistance).to_value(1))
@@ -141,6 +144,41 @@ def VAR_to_NSB_photon_rate(baseline_VAR,ntel,gain=None):
                                       gain=gain)
     return NSB_rate
 
+def find_dark_files(data_dir):
+    dark_files = []
+    dark_names=['dark','DARK','drak','DRAK',"Dark","Drak"]
+    file_list=glob.glob(data_dir+"/*.fits.fz")
+
+    for ii,file_path in enumerate(file_list):
+        run_number = int(file_path.split("_")[-1].split('.')[0])
+        try :
+            f = astropy.io.fits.open(file_path)
+            target = f[2].header['TARGET'] 
+        except:
+            print('failed reading {}'.format(file_path))
+            continue
+        if target in dark_names:
+            dark_files.append(file_path)
+        f.close()
+    return dark_files
+
+
+def get_dark_baseline(filename,max_evt=500,event_type=8):
+        
+        raw_baselines  = [ [] for ii in range(1296)]
+       
+        data_stream = SST1MEventSource([filename],
+                                       max_events=max_evt)
+        for ii,event in enumerate(data_stream):
+                    tel = event.sst1m.r0.tels_with_data[0]
+                    r0data = event.sst1m.r0.tel[tel]
+
+                    if r0data._camera_event_type.value==event_type:
+                        for pix in range(1296):
+                            raw_baselines[pix].append(r0data.adc_samples[pix,:50])
+        raw_baselines  = np.array(raw_baselines)
+        
+        return raw_baselines.mean(axis=(1,2))
 ############
  #### tools to plot data :
 ############
@@ -193,7 +231,7 @@ def plot_average_nsb_VS_time(ped_table,ntel,ax=None):
         f,ax = plt.subplots(figsize=(10,5))
     ax.plot(Dates,NSB,'.',label='tel {}'.format(ntel%20))
     plt.xlabel('Time')
-    plt.ylabel('NSB photons [MHz]')
+    plt.ylabel('NSB [MHz]')
     return ax
 
 def plot_average_nsb_photon_rate_VS_time(ped_table,ntel,ax=None):
@@ -203,5 +241,5 @@ def plot_average_nsb_photon_rate_VS_time(ped_table,ntel,ax=None):
         f,ax = plt.subplots(figsize=(10,5))
     ax.plot(Dates,NSB,'.',label='tel {}'.format(ntel%20))
     plt.xlabel('Time')
-    plt.ylabel('NSB [MHz]')
+    plt.ylabel('NSB photons [MHz]')
     return ax
