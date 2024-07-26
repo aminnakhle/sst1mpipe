@@ -21,7 +21,7 @@ $> python sst1mpipe_r0_dl1.py
 """
 
 import sst1mpipe
-from sst1mpipe.utils.NSB_tools import VAR_to_Idrop, get_optical_eff_shift, VAR_to_NSB
+from sst1mpipe.utils.NSB_tools import VAR_to_Idrop, VAR_to_NSB
 from sst1mpipe.utils import (
     correct_true_image, 
     energy_min_cut,
