@@ -11,7 +11,7 @@ from sst1mpipe.utils import get_subarray
 
 MON_EVT_TYPE = 8
 class sliding_pedestals:
-    def __init__(self,max_array_size = 50):
+    def __init__(self,max_array_size = 300):
         self.timestamps = np.array([])
         self.ped_array  = np.array([])
         self.max_array_size = max_array_size
@@ -74,7 +74,7 @@ class sliding_pedestals:
         mon_container.charge_std      = self.get_charge_std()
         return
 
-    def load_firsts_pedestals(self,file_path,max_n_ped=10,max_evt=200):
+    def load_firsts_pedestals(self,file_path,max_n_ped=50,max_evt=200):
 
         data_stream = SST1MEventSource([file_path],
                                        max_events=max_evt)
