@@ -70,6 +70,13 @@ def parse_args():
                     default=''
                     )
 
+    parser.add_argument(
+                '--histogram-bins', type=int,
+                dest='bins',
+                help='Binninig of the distributions.',
+                default=500
+                )
+                
     args = parser.parse_args()
     return args
 
@@ -81,9 +88,10 @@ def main():
     outpath = args.outdir
     datastore = args.dl3_indexes
     data_path_dl1 = args.dl1_dir
+    nbins = args.bins
     date = args.date
 
-    bins=np.logspace(1, 5, 200)
+    bins=np.logspace(1, 5, nbins)
     bins_width = bins[1:] - bins[:-1]
 
     # get dl3

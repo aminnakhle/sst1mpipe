@@ -50,86 +50,6 @@ from astropy.time import Time
 import glob
 
 
-def get_target(file, force_pointing=False):
-    """
-    Extracts the target information from the string 
-    stored in the TARGET field of the input file 
-    Fits header. The string is expected to have the 
-    following format \"Target,RA[in deg],DEC[in deg]\".
-    Target may contain wobble information. Files stored 
-    during the transition between wobbles must be flagged 
-    with \'Transition\' string.
-
-    Parameters
-    ----------
-    file: string
-        Path to the raw fits data file
-    force_poiting: bool
-        If True, Transition flag is ignored and the
-        file is processed anyway
-
-    Returns
-    -------
-    target: string
-    ra: float
-        RA in degress
-    dec: float
-        DEC in degress
-    wobble: string
-
-    """
-
-    with fits.open(file) as hdul:
-
-        try:
-            header = hdul["Events"].header
-            # Delimiter should be hopefuly either ',' or '_'
-            # The string in the TARGET field is expected in the form: target[]wobble[]ra[]dec, 
-            # but targetwobble[]ra[]dec, and also target_wobble[]ra[]dec should work as well
-            pointing_string = header['TARGET']
-            logging.info('TARGET field: ' + pointing_string)
-            if pointing_string == 'Transition' and not force_pointing:
-                logging.info('Transition to the next wobble, not stable pointing direction, FILE SKIPPED.')
-                hdul.close()
-                exit()
-            if pointing_string.count('_') > 1:
-                delimiter = '_'
-            elif pointing_string.count(',') > 1:
-                delimiter = ','
-            else:
-                logging.warning('Wrong format of coordinates in the fits header, unknown delimiter')
-                target, ra, dec, wobble = None, None, None, None
-                return target, ra, dec, wobble
-
-            target = pointing_string.split(delimiter)[0]
-            try:
-                if len(pointing_string.split(delimiter)) == 4:
-                    ra = float(pointing_string.split(delimiter)[2])
-                    dec = float(pointing_string.split(delimiter)[3])
-                elif len(pointing_string.split(delimiter)) == 3:
-                    ra = float(pointing_string.split(delimiter)[1])
-                    dec = float(pointing_string.split(delimiter)[2])
-                else: 
-                    logging.warning('Wrong format of coordinates in the fits header. Field with either 3 or 4 entries is expected.')
-                    ra, dec = None, None
-            except ValueError:
-                logging.warning('Wrong format of coordinates in the fits header, cannot convert to float!')
-                ra, dec = None, None
-            if 'W1' in pointing_string:
-                wobble = 'W1'
-            elif 'W2' in pointing_string:
-                wobble = 'W2'
-            elif 'W3' in pointing_string:
-                wobble = 'W3'
-            elif 'W4' in pointing_string:
-                wobble = 'W4'
-            else: wobble = 'UNDEF'
-        except KeyError:
-            logging.warning('TARGET field is not in the fits header! Cannot read pointing RA, DEC. Are you sure that this is a valid file with science data?')
-            target, ra, dec, wobble = None, None, None, None
-    return target, ra, dec, wobble
-
-
 def read_charges_data(file):
     """
     Read pixel charges distribution from 
@@ -536,8 +456,7 @@ def write_wr_timestamps(file, event_source=None):
 
 
 def write_assumed_pointing(
-        file, config=None, pointing_ra=None, 
-        pointing_dec=None):
+        processing_info, config=None):
     """
     Writes pointing info (per event true_tel_az, true_tel_alt) 
     in the main DL1 table.
@@ -556,7 +475,7 @@ def write_assumed_pointing(
     -------
 
     """
-
+    file = processing_info.output_file
     telescopes = get_telescopes(file)
 
     for tel in telescopes:
@@ -565,8 +484,8 @@ def write_assumed_pointing(
 
         location = get_location(config=config, tel=tel)
 
-        pointing_ra = float(pointing_ra) * u.deg
-        pointing_dec = float(pointing_dec) * u.deg
+        pointing_ra = float(processing_info.pointing_ra) * u.deg
+        pointing_dec = float(processing_info.pointing_dec) * u.deg
 
         wobble_coords = SkyCoord(ra=pointing_ra, dec=pointing_dec, frame='icrs')
         time = Time(params['local_time'], format='unix', scale='utc')
@@ -1153,53 +1072,20 @@ def write_dl2_info(dl2_file, rfs_used=None):
         info.append()
 
 
-def write_dl1_info(
-        dl1_file, target=None, ra=None,
-        dec=None, manual_coords=False, wobble=None,
-        calib_file=None, window_file=None, 
-        n_saturated=0, n_pedestal=0, 
-        n_survived_pedestals=0, n_triggered_tel1=0,
-        n_triggered_tel2=0, swat_event_ids_used=False,
-    ):
+def write_dl1_info(processing_info):
     """
     Stores info tab in the DL1 file
 
     Parameters
     ----------
-    dl1_file: string
-    target: string
-        Observed source
-    ra: float
-        Pointing RA in deg
-    dec: float
-        Pointing DEC in deg
-    manual_coords: bool
-        Pointing coordinates entered manualy 
-        (i.e. not read from the raw FITS file)
-    wobble: string
-    calib_file: string
-        Calibration file used
-    window_file: string
-        Window file used  
-    n_saturated: int
-        Total number of saturated events in the file
-    n_pedestal: int
-        Total number of pedestal events in the file
-    n_survived_pedestals
-        Number of pedestal events which survived cleaning
-    n_triggered_tel1: int
-        Total number of TEL1 triggered events in the file
-    n_triggered_tel2: int
-        Total number of TEL2 triggered events in the file
-    swat_event_ids_used: bool
-        If true, coincident events from given night have 
-        exactly the same event ID
+        processing_info: Class Monitoring_R0_DL1
 
     Returns
     -------
 
     """
-    
+    dl1_file = processing_info.output_file
+
     with tables.open_file(dl1_file, mode='a') as file:
 
         table = file.create_table(
@@ -1210,19 +1096,19 @@ def write_dl1_info(
         )
         info = table.row
         info['sst1mpipe_version'] = sst1mpipe.__version__
-        info['target'] = target
-        info['ra'] = ra
-        info['dec'] = dec
-        info['manual_coords'] = manual_coords
-        info['wobble'] = wobble
-        info['calib_file'] = calib_file
-        info['window_file'] = window_file
-        info['n_saturated'] = n_saturated
-        info['n_pedestal'] = n_pedestal
-        info['n_survived_pedestals'] = n_survived_pedestals
-        info['n_triggered_tel1'] = n_triggered_tel1
-        info['n_triggered_tel2'] = n_triggered_tel2
-        info['swat_event_ids_used'] = swat_event_ids_used
+        info['target'] = processing_info.target
+        info['ra'] = processing_info.pointing_ra
+        info['dec'] = processing_info.pointing_dec
+        info['manual_coords'] = processing_info.pointing_manual
+        info['wobble'] = processing_info.wobble
+        info['calib_file'] = processing_info.calibration_file
+        info['window_file'] = processing_info.window_file
+        info['n_saturated'] = processing_info.n_saturated
+        info['n_pedestal'] = processing_info.n_pedestals
+        info['n_survived_pedestals'] = processing_info.n_pedestals_survived
+        info['n_triggered_tel1'] = processing_info.n_triggered_tel1
+        info['n_triggered_tel2'] = processing_info.n_triggered_tel2
+        info['swat_event_ids_used'] = processing_info.swat_event_ids_used
         info.append()
 
 

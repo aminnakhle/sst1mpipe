@@ -3,8 +3,10 @@ import pkg_resources
 import pandas as pd
 from os import path
 import logging
-from sst1mpipe.utils import get_tel_string
-from sst1mpipe.utils.NSB_tools import VAR_to_Idrop
+from sst1mpipe.utils import (
+    get_tel_string, 
+    VAR_to_Idrop
+    )
 
 
 def get_default_window(telescope=None):
@@ -70,34 +72,14 @@ def get_window_corr_factors(telescope=None, config=None):
         logging.info("NO WINDOW TRANSMITTANCE FILE FOR TELESCOPE %s FOUND IN THE CFG FILE, DEFAULT WINDOW USED.", telescope)
         window_corr, window_file = get_default_window(telescope=telescope)
 
-    # Correct for wrongly mapped pixels
-    tel_string = get_tel_string(telescope, mc=False)
-    if config['swap_modules_59_88'][tel_string]:
-        # module 59
-        mask59 = np.zeros(1296, dtype=bool)
-        mask59[1029] = True
-        mask59[1098:1102+1] = True
-        mask59[1133:1134+1] = True
-        mask59[1064:1067+1] = True
-        window_corr_59 = window_corr[mask59]
-        
-        # module 88
-        mask88 = np.zeros(1296, dtype=bool)
-        mask88[1103] = True
-        mask88[1165:1169+1] = True
-        mask88[1194:1195+1] = True
-        mask88[1135:1138+1] = True
-        window_corr_88 = window_corr[mask88]
-        
-        window_corr[mask59] = window_corr_88
-        window_corr[mask88] = window_corr_59  
-
     return window_corr, window_file
 
 
 def window_transmittance_correction(
         event, window_corr_factors=None, 
-        telescope=None):
+        telescope=None,
+        swap_flag=False
+        ):
     """
     Applies window transmittance correction 
     on the integrated waveforms (images)
@@ -110,6 +92,9 @@ def window_transmittance_correction(
     telescope: int
         Telescope number as in
         event.sst1m.r0.tels_with_data
+    swap_flag: bool
+        Swap (or not) window correction
+        in wrongly connected pixels
 
     Returns
     -------
@@ -118,13 +103,34 @@ def window_transmittance_correction(
 
     """
 
+    if swap_flag:
+
+        # module 59
+        mask59 = np.zeros(1296, dtype=bool)
+        mask59[1029] = True
+        mask59[1098:1102+1] = True
+        mask59[1133:1134+1] = True
+        mask59[1064:1067+1] = True
+        window_corr_59 = window_corr_factors[mask59]
+        
+        # module 88
+        mask88 = np.zeros(1296, dtype=bool)
+        mask88[1103] = True
+        mask88[1165:1169+1] = True
+        mask88[1194:1195+1] = True
+        mask88[1135:1138+1] = True
+        window_corr_88 = window_corr_factors[mask88]
+        
+        window_corr_factors[mask59] = window_corr_88
+        window_corr_factors[mask88] = window_corr_59  
+
     image_corrected = event.dl1.tel[telescope].image / window_corr_factors
     event.dl1.tel[telescope].image = image_corrected.astype(np.float32) 
 
     return event
 
 
-def saturated_charge_correction(event):
+def saturated_charge_correction(event, processing_info=None):
     """
     Finds saturated waveforms and applies different peak integration on
     them, as the standard one does not perform well in such cases. This
@@ -141,9 +147,7 @@ def saturated_charge_correction(event):
     -------
     event:
         sst1mpipe.io.containers.SST1MArrayEventContainer
-    saturated: bool
-        True if integration correction was applied on at least 
-        one pixel waveform
+
     """
 
     saturated_threshold = 3000
@@ -201,8 +205,9 @@ def saturated_charge_correction(event):
         if saturated:
             event.dl1.tel[telescope].image = image_new
             event.dl1.tel[telescope].peak_time = peaktime_new
+            processing_info.n_saturated += 1
 
-    return event, saturated
+    return event
 
 
 class Calibrator_R0_R1:
@@ -236,6 +241,14 @@ class Calibrator_R0_R1:
         self.telescope = telescope
         self.config = config
         self.mask_bad = np.array([])
+        self.pixels_removed = 0
+
+        if self.config["telescope_calibration"]["bad_calib_px_interpolation"]:
+            logging.info("Charge in pixels with bad calibration parameters are interpolated.")
+            if self.config["telescope_calibration"]["dynamic_dead_px_interpolation"]:
+                logging.info("Charge in dead pixels are interpolated (if pedestal info is provided).")
+        else:
+            logging.info("No pixel charge interpolation is applied. Gain in pixels with wrong calibration is calcualted as a global average of all gains.")
 
         # get calibration parameters during initialization
         self.get_calibration_parameters()
@@ -270,13 +283,16 @@ class Calibrator_R0_R1:
             VI = VAR_to_Idrop(pedestal_info.get_charge_std()**2, self.telescope)
         else:
             VI = 1.0
-            
+
         event.r1.tel[self.telescope].waveform = (baseline_subtracted / self.dc_to_pe / VI ).T
 
-        # This function removes bad pixels with not well determined dc_to_pe
+        # This function removes bad pixels 
+        # - with not well determined dc_to_pe
+        # - based on pedestal variation, i.e. dynamicaly
         # Charges in these pixels are then interpolated using method set in cfg: invalid_pixel_handler_type
         # Default is NeighborAverage, but can be turned off with 'null'
-        event = self.remove_bad_pixels_gains(event)
+        if self.config["telescope_calibration"]["bad_calib_px_interpolation"]:
+            event = self.remove_bad_pixels_calib(event, pedestal_info=pedestal_info)
 
         return event
 
@@ -340,10 +356,12 @@ class Calibrator_R0_R1:
         """
 
         self.dc_to_pe = np.array(self.calibration_parameters['dc_to_pe']) 
+        # masking pixels with bad calibration parameters
         self.mask_bad = self.calibration_parameters['calib_flag'] != 1
+        self.dc_to_pe[self.mask_bad] = self.dc_to_pe[~self.mask_bad].mean()
 
 
-    def remove_bad_pixels_gains(self, event):
+    def remove_bad_pixels_calib(self, event, pedestal_info=None):
         """
         Fills bad pixel waveforms with zeros and 
         flags them in proper containers. Charges in 
@@ -364,9 +382,20 @@ class Calibrator_R0_R1:
 
         """
 
-        mask_bad = self.mask_bad.astype(bool)
-        event.r0.tel[self.telescope].waveform[0][mask_bad] = np.zeros(50)
-        event.r1.tel[self.telescope].waveform[mask_bad] = np.zeros(50)
+        # masking pixels with bad calibration parameters
+        mask_bad_calib = self.mask_bad.astype(bool)
+
+        # masking pixels with too low baseline std
+        if pedestal_info is not None and self.config["telescope_calibration"]["dynamic_dead_px_interpolation"]:
+            mask_bad_std = pedestal_info.get_charge_std() < 2.5
+            mask_bad = mask_bad_calib + mask_bad_std
+        else:
+            mask_bad = mask_bad_calib
+        self.pixels_removed = sum(mask_bad)
+
+        N_samples = event.r0.tel[self.telescope].waveform[0].shape[1]
+        event.r0.tel[self.telescope].waveform[0][mask_bad] = np.zeros(N_samples)
+        event.r1.tel[self.telescope].waveform[mask_bad] = np.zeros(N_samples)
         event.mon.tel[self.telescope].pixel_status['hardware_failing_pixels'] = np.array([mask_bad])
         event.mon.tel[self.telescope].pixel_status['flatfield_failing_pixels'] = np.array([mask_bad])
         event.mon.tel[self.telescope].pixel_status['pedestal_failing_pixels'] = np.array([mask_bad])

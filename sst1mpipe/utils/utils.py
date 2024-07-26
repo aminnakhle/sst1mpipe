@@ -12,6 +12,7 @@ from ctapipe.instrument import SubarrayDescription
 import ctaplot
 from astropy.time import Time
 from astropy.table import Table
+from astropy.io import fits
 import astropy.constants as c
 import numpy as np
 import pandas as pd
@@ -23,6 +24,88 @@ import os
 from astroquery.simbad import Simbad
 import pkg_resources
 from os import path
+
+
+def get_target(file, force_pointing=False):
+    """
+    Extracts the target information from the string 
+    stored in the TARGET field of the input file 
+    Fits header. The string is expected to have the 
+    following format \"Target,RA[in deg],DEC[in deg]\".
+    Target may contain wobble information. Files stored 
+    during the transition between wobbles must be flagged 
+    with \'Transition\' string.
+
+    Parameters
+    ----------
+    file: string
+        Path to the raw fits data file
+    force_poiting: bool
+        If True, Transition flag is ignored and the
+        file is processed anyway
+
+    Returns
+    -------
+    target: string
+    ra: float
+        RA in degress
+    dec: float
+        DEC in degress
+    wobble: string
+
+    """
+
+    with fits.open(file) as hdul:
+
+        try:
+            header = hdul["Events"].header
+            # Delimiter should be hopefuly either ',' or '_'
+            # The string in the TARGET field is expected in the form: target[]wobble[]ra[]dec, 
+            # but targetwobble[]ra[]dec, and also target_wobble[]ra[]dec should work as well
+            pointing_string = header['TARGET']
+            logging.info('TARGET field: ' + pointing_string)
+            targets_to_skip = ['transition', 'Transition', 'TRANSITION', 'Dark', 'DARK', 'dark']
+            if pointing_string in targets_to_skip and not force_pointing:
+                logging.info('Transition to the next wobble, or dark file, not on-source pointing direction, FILE SKIPPED.')
+                hdul.close()
+                exit()
+            if pointing_string.count('_') > 1:
+                delimiter = '_'
+            elif pointing_string.count(',') > 1:
+                delimiter = ','
+            else:
+                logging.warning('Wrong format of coordinates in the fits header, unknown delimiter')
+                target, ra, dec, wobble = None, None, None, None
+                return target, ra, dec, wobble
+
+            target = pointing_string.split(delimiter)[0]
+            try:
+                if len(pointing_string.split(delimiter)) == 4:
+                    ra = float(pointing_string.split(delimiter)[2])
+                    dec = float(pointing_string.split(delimiter)[3])
+                elif len(pointing_string.split(delimiter)) == 3:
+                    ra = float(pointing_string.split(delimiter)[1])
+                    dec = float(pointing_string.split(delimiter)[2])
+                else: 
+                    logging.warning('Wrong format of coordinates in the fits header. Field with either 3 or 4 entries is expected.')
+                    ra, dec = None, None
+            except ValueError:
+                logging.warning('Wrong format of coordinates in the fits header, cannot convert to float!')
+                ra, dec = None, None
+            if 'W1' in pointing_string:
+                wobble = 'W1'
+            elif 'W2' in pointing_string:
+                wobble = 'W2'
+            elif 'W3' in pointing_string:
+                wobble = 'W3'
+            elif 'W4' in pointing_string:
+                wobble = 'W4'
+            else: wobble = 'UNDEF'
+        except KeyError:
+            logging.warning('TARGET field is not in the fits header! Cannot read pointing RA, DEC. Are you sure that this is a valid file with science data?')
+            target, ra, dec, wobble = None, None, None, None
+    return target, ra, dec, wobble
+
 
 
 def get_nsb_levels_rates(config):
@@ -737,11 +820,47 @@ def correct_true_image(event):
     return event
 
 
-def swap_modules_59_88(event, tel=None):
+def get_swap_flag(event):
+    """
+    Correct for wrongly mapped pixels of tel2 between
+    camera refurbishment in September 2023 and physical 
+    repair in July 2024. 
+
+    Parameters
+    ----------
+    event:
+        sst1mpipe.io.containers.SST1MArrayEventContainer
+
+    Returns
+    -------
+    bool:
+        Swap (or not) R1 waveforms and window corrections
+        in wrongly connected pixels
+
+    """
+
+    tel = event.sst1m.r0.tels_with_data[0]
+    flag = False
+
+    if tel == 22:
+        localtime = event.sst1m.r0.tel[tel].local_camera_clock/1e9
+        time = Time(localtime, format='unix_tai')
+        time_min = Time('2023-09-01T00:00:00.000', format='isot', scale='utc')
+        time_max = Time('2024-07-18T00:00:00.000', format='isot', scale='utc')
+
+        if (time > time_min) and (time < time_max):
+            flag = True
+            logging.info('Data on tel ' + str(tel) + ' taken between Sep 2023 and Jul 2024, swapping wrongly connected modules 59 and 88.')
+
+    return flag
+
+
+def swap_modules_59_88(event,tel=None, swap_flag=False):
     """
     Swaps pixel R1 waveforms in two wrongly
-    connected modules of tel2 after camera refurbishment
-    in 2023. Pixel numbering is based on 
+    connected modules of tel2 between camera refurbishment
+    in September 2023 and physical repair in July 2024. 
+    Pixel numbering is based on 
     test/resources/camera_config.cfg
 
     Parameters
@@ -749,6 +868,9 @@ def swap_modules_59_88(event, tel=None):
     event:
         sst1mpipe.io.containers.SST1MArrayEventContainer
     tel: int
+    swap_flag: bool
+        Swap (or not) R1 waveforms
+        in wrongly connected pixels
 
     Returns
     -------
@@ -757,24 +879,26 @@ def swap_modules_59_88(event, tel=None):
 
     """
 
-    # module 59
-    mask59 = np.zeros(1296, dtype=bool)
-    mask59[1029] = True
-    mask59[1098:1102+1] = True
-    mask59[1133:1134+1] = True
-    mask59[1064:1067+1] = True
-    waveform_59 = event.r1.tel[tel].waveform[mask59, :]
-    
-    # module 88
-    mask88 = np.zeros(1296, dtype=bool)
-    mask88[1103] = True
-    mask88[1165:1169+1] = True
-    mask88[1194:1195+1] = True
-    mask88[1135:1138+1] = True
-    waveform_88 = event.r1.tel[tel].waveform[mask88, :]
-    
-    event.r1.tel[tel].waveform[mask59] = waveform_88
-    event.r1.tel[tel].waveform[mask88] = waveform_59   
+    if swap_flag:
+
+        # module 59
+        mask59 = np.zeros(1296, dtype=bool)
+        mask59[1029] = True
+        mask59[1098:1102+1] = True
+        mask59[1133:1134+1] = True
+        mask59[1064:1067+1] = True
+        waveform_59 = event.r1.tel[tel].waveform[mask59, :]
+        
+        # module 88
+        mask88 = np.zeros(1296, dtype=bool)
+        mask88[1103] = True
+        mask88[1165:1169+1] = True
+        mask88[1194:1195+1] = True
+        mask88[1135:1138+1] = True
+        waveform_88 = event.r1.tel[tel].waveform[mask88, :]
+        
+        event.r1.tel[tel].waveform[mask59] = waveform_88
+        event.r1.tel[tel].waveform[mask88] = waveform_59   
 
     return event
 
@@ -811,8 +935,9 @@ def remove_bad_pixels(event, config=None):
                     mask_bad[config["analysis"]["bad_pixels"][tel_name]] = 1
                     mask_bad = mask_bad.astype(bool)
 
-                    event.r0.tel[tel].waveform[0][mask_bad] = np.zeros(50)
-                    event.r1.tel[tel].waveform[mask_bad] = np.zeros(50)
+                    N_samples = event.r0.tel[tel].waveform[0].shape[1]
+                    event.r0.tel[tel].waveform[0][mask_bad] = np.zeros(N_samples)
+                    event.r1.tel[tel].waveform[mask_bad] = np.zeros(N_samples)
                     event.simulation.tel[tel].true_image[mask_bad] = 0
                     event.mon.tel[tel].pixel_status['hardware_failing_pixels'] = np.array([mask_bad])
                     event.mon.tel[tel].pixel_status['flatfield_failing_pixels'] = np.array([mask_bad])

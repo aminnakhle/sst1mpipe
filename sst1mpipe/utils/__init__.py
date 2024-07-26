@@ -49,9 +49,11 @@ from .utils import (
     get_avg_pointing,
     get_closest_rf_model,
     get_target_pos,
+    get_target,
     get_GTIs,
     get_pointing_radec,
-    swap_modules_59_88
+    swap_modules_59_88,
+    get_swap_flag
 )
 
 from .cleaning import (
@@ -67,6 +69,6 @@ from .NSB_tools import (
     VAR_to_NSB_photon_rate
     )
 
-from .monitoring_pedestals import (
-    sliding_pedestals,
-)
+#from .monitoring_pedestals import (
+#    sliding_pedestals,
+#)
