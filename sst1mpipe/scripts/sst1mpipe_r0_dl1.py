@@ -371,33 +371,40 @@ def main():
                 if not bool(i % 100) and config["telescope_calibration"]["bad_calib_px_interpolation"]:
                     logging.info("N pixels interpolated (every 100th event): %d", calibrator_r0_r1.pixels_removed)
                 if event_type==8:
+                    pedestal_info.add_ped_evt(event)
+
                     # writing pedestal info in dl1
                     if ( (pedestal_info.processed_pedestals !=0) and \
                          (pedestal_info.processed_pedestals%20 == 0)):
 
+                        pedestal_info.fill_mon_container(event)
                         writer._writer.write(
                             table_name='dl1/monitoring/telescope/pedestal',
                             containers=[event.mon.tel[tel].pedestal],
                         )
 
-                    pedestal_info.add_ped_evt(event)
-                    pedestal_info.fill_mon_container(event)
+                    
+                    
 
                 elif not pedestal_info.pedestals_in_file:
-                    # writing pedestal info in dl1
-                    if ( (pedestal_info.processed_pedestals !=0) and \
-                         (pedestal_info.processed_pedestals%20 == 0)):
 
-                        writer._writer.write(
-                            table_name='dl1/monitoring/telescope/pedestal',
-                            containers=[event.mon.tel[tel].pedestal],
-                        )
                     clenaning_mask = event.dl1.tel[tel].image_mask
                     # Arbitrary cut, just to prevent too big showers from being used
                     # We also take only every x-th event to gain some cputime
                     if (sum(clenaning_mask) < 20) and not bool(i % 10):
                         pedestal_info.add_ped_evt(event, cleaning_mask=clenaning_mask)
+
+                    # writing pedestal info in dl1
+                    if ( (pedestal_info.processed_pedestals !=0) and \
+                         (pedestal_info.processed_pedestals%20 == 0)):
+
                         pedestal_info.fill_mon_container(event)
+                        writer._writer.write(
+                            table_name='dl1/monitoring/telescope/pedestal',
+                            containers=[event.mon.tel[tel].pedestal],
+                        )
+
+                        
 
             # Extraction of pixel charge distribution for MC-data tuning
             if pixel_charges:
