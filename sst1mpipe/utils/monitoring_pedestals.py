@@ -12,10 +12,11 @@ import logging
 
 MON_EVT_TYPE = 8
 class sliding_pedestals:
-    def __init__(self, input_file=None, max_array_size = 20, config=None):
+    def __init__(self, input_file=None, max_array_size = 30, config=None):
 
         self.timestamps = np.array([])
-        self.ped_array  = np.array([])
+        self.ped_mean_array  = np.array([])
+        self.ped_std_array   = np.array([])
         self.max_array_size = max_array_size
         self.processed_pedestals = 0
         self.config = config
@@ -43,18 +44,21 @@ class sliding_pedestals:
             pedestal[cleaning_mask] = -100 * np.ones(pedestal.shape[1])
         timestamp = evt.sst1m.r0.tel[tel].local_camera_clock/1e9
         
-        if self.ped_array.shape[0] == 0:
-            self.ped_array = np.array([pedestal])
+        if self.timestamps.shape[0] == 0:
+            self.ped_mean_array = np.array([pedestal.mean(axis=1)])
+            self.ped_std_array  = np.array([pedestal.std(axis=1)])
             self.timestamps = np.array([timestamp])
         else:
-            self.ped_array = np.vstack((self.ped_array,[pedestal]))
+            self.ped_mean_array = np.vstack((self.ped_mean_array, [pedestal.mean(axis=1)]))
+            self.ped_std_array  = np.vstack((self.ped_std_array,  [pedestal.std(axis=1)]))
             self.timestamps = np.append(self.timestamps,timestamp)
-        if self.ped_array.shape[0] > self.max_array_size:
-            self.ped_array = self.ped_array[1:]
+        if self.timestamps.shape[0] > self.max_array_size:
+            self.ped_mean_array =self.ped_mean_array[1:]
+            self.ped_std_array =self.ped_std_array[1:]
             self.timestamps = self.timestamps[1:]
             
     def get_n_events(self):
-        return self.ped_array.shape[0]
+        return self.timestamps.shape[0]
 
     def get_mean_ts(self):
         return self.timestamps.mean() *u.s
@@ -66,19 +70,19 @@ class sliding_pedestals:
         return self.timestamps[-1] *u.s
 
     def get_charge_mean(self):
-        pedarray = self.ped_array
+        pedarray = self.ped_mean_array
         masked = np.ma.masked_values(pedarray, -100)
-        return masked.mean(axis=(0,2)).data
+        return masked.mean(axis=0).data
 
     def get_charge_median(self):
-        pedarray = self.ped_array
+        pedarray = self.ped_mean_array
         masked = np.ma.masked_values(pedarray, -100)
-        return np.median(masked.mean(axis=2).data,axis=0)
+        return np.median(masked.data,axis=0)
 
     def get_charge_std(self):
-        pedarray = self.ped_array
-        masked = np.ma.masked_values(pedarray, -100)
-        return masked.std(axis=2).data.mean(axis=0)
+        pedarray = self.ped_std_array
+        masked = np.ma.masked_values(pedarray, 0)
+        return masked.data.mean(axis=0)
     
     def fill_mon_container(self, evt):
         tel = evt.sst1m.r0.tels_with_data[0]
@@ -92,7 +96,7 @@ class sliding_pedestals:
         mon_container.charge_std      = self.get_charge_std()
         return
 
-    def load_firsts_pedestals(self,max_n_ped=19,max_evt=200):
+    def load_firsts_pedestals(self,max_n_ped=10,max_evt=1000):
 
 
         data_stream = SST1MEventSource([self.input_file],
