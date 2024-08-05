@@ -12,7 +12,7 @@ import logging
 
 MON_EVT_TYPE = 8
 class sliding_pedestals:
-    def __init__(self, input_file=None, max_array_size = 30, config=None):
+    def __init__(self, input_file=None, max_array_size = 100, config=None):
 
         self.timestamps = np.array([])
         self.ped_mean_array  = np.array([])
@@ -96,7 +96,7 @@ class sliding_pedestals:
         mon_container.charge_std      = self.get_charge_std()
         return
 
-    def load_firsts_pedestals(self,max_n_ped=10,max_evt=1000):
+    def load_firsts_pedestals(self,max_n_ped=50,max_evt=1000):
 
 
         data_stream = SST1MEventSource([self.input_file],
