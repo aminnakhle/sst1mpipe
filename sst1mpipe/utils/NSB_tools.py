@@ -14,7 +14,7 @@ from scipy import interpolate
 
 import matplotlib.pyplot as plt 
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
-
+import glob
 
 ## spline aprox NSB : VAR[ADC]->SHIFT[ADC]
 ## these are rough aprox.. To be updated!
@@ -211,14 +211,14 @@ def get_ped_table_low_res(file_list):
         if bline_table is None :
             try:
                 bline_table = read_table(dl1file,
-                                         '/dl1/monitoring/telescope/pedestal')[0]
+                                         '/dl1/monitoring/telescope/pedestal')[-1]
             except:
                 print("pedestal not found in {}".format(dl1file))
         else :
             try:
                 bline_table = astropy.table.vstack([bline_table,
                                                    read_table(dl1file,
-                                                              '/dl1/monitoring/telescope/pedestal')[0]])
+                                                              '/dl1/monitoring/telescope/pedestal')[-1]])
             except:
                 print("pedestal not found in {}".format(dl1file))
     return bline_table
