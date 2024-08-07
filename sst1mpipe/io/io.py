@@ -1203,7 +1203,7 @@ def load_more_dl2_files(files, config=None, gammaness_cut=None):
 
             # typical dt between events should be about 0.1 s, even for stereo it should not be higher that 0.5 s
             # length of a typical file is about 20 s, depending on conditions
-            if (pointing.separation(pointing0) > 0.2 * u.deg) or (dt > 2):
+            if (pointing.separation(pointing0) > 0.2 * u.deg) or (dt > 30):
                 GTI_stop.append(times0.iloc[-1])
                 GTI_start.append(times.iloc[0])
                 pointing0 = pointing
