@@ -34,7 +34,7 @@
     },
 
     "stereo": {
-      "event_matching_method" : "SWATEventIDs",
+      "event_matching_method" : "WhiteRabbitClosest",
       "SlidingWindow": {
         "window_half_width": 1E-3,
         "offset_search": {
