@@ -379,10 +379,17 @@ def plot_mc_data(data=None, mc=None, scale=1):
     fig.tight_layout()
 
 
+def plot_preliminary(ax=None, fontsize=60):
+    ax.text(0.5, 0.5, 'PRELIMINARY', transform=ax.transAxes,
+        fontsize=fontsize, color='red', alpha=0.15,
+        ha='center', va='center', rotation=30)
+
+
 def plot_energy_resolution(
         e_bins, e_tables=None, labels=None, 
         markers=None, axes=None, plot=None, 
-        preliminary=False):
+        preliminary=False,
+        skip_bins_first=0, skip_bins_last=0):
     """
     Plots energy resolution and bias.
 
@@ -401,6 +408,10 @@ def plot_energy_resolution(
         or \'bias\'
     preliminary: bool
         Add preliminary watermark
+    skip_bins_first: float
+        Skip certain number of first bins, e.g. with very low number of events
+    skip_bins_last: float
+        Skip certain number of last bins
 
     Returns
     -------
@@ -420,14 +431,23 @@ def plot_energy_resolution(
             plot_preliminary(ax=axes[1])
 
         for table, label, marker in zip(e_tables, labels, markers):
-            axes[0].errorbar(energy_center, table['energy_res'],
-                    xerr=(energy_center - e_bins['energy_bins'][:-1], e_bins['energy_bins'][1:] - energy_center),
-                    yerr=(table['energy_res'] - table['energy_res_err_lo'], table['energy_res_err_hi'] - table['energy_res']),
+
+            energy_center_plot = energy_center[skip_bins_first:len(energy_center)-skip_bins_last]
+            table_plot = table[skip_bins_first:len(energy_center)-skip_bins_last]
+
+            axes[0].errorbar(energy_center_plot, table_plot['energy_res'],
+                    xerr=(energy_center_plot - e_bins['energy_bins'][skip_bins_first:len(e_bins)-1-skip_bins_last], e_bins['energy_bins'][skip_bins_first+1:len(e_bins)-skip_bins_last] - energy_center_plot),
+                    yerr=(table_plot['energy_res'] - table_plot['energy_res_err_lo'], table_plot['energy_res_err_hi'] - table_plot['energy_res']),
                     fmt=marker,
                     label=label,
                     markersize=marker_size
                     )
-            axes[1].errorbar(energy_center, table['energy_bias'], xerr=(energy_center - e_bins['energy_bins'][:-1], e_bins['energy_bins'][1:] - energy_center), fmt='o', label=label)
+            axes[1].errorbar(energy_center_plot, 
+                    table_plot['energy_bias'], 
+                    xerr=(energy_center_plot - e_bins['energy_bins'][skip_bins_first:len(e_bins)-1-skip_bins_last], e_bins['energy_bins'][skip_bins_first+1:len(e_bins)-skip_bins_last] - energy_center_plot),
+                    fmt='o', 
+                    label=label
+                    )
 
         energy_center_unit = energy_center.unit.to_string("latex")
         axes[0].legend()
@@ -455,9 +475,13 @@ def plot_energy_resolution(
                 plot_preliminary(ax=axes[0])
             
             for table, label, marker in zip(e_tables, labels, markers):
-                axes[0].errorbar(energy_center, table['energy_res'],
-                    xerr=(energy_center - e_bins['energy_bins'][:-1], e_bins['energy_bins'][1:] - energy_center),
-                    yerr=(table['energy_res'] - table['energy_res_err_lo'], table['energy_res_err_hi'] - table['energy_res']),
+
+                energy_center_plot = energy_center[skip_bins_first:len(energy_center)-skip_bins_last]
+                table_plot = table[skip_bins_first:len(energy_center)-skip_bins_last]
+
+                axes[0].errorbar(energy_center_plot, table_plot['energy_res'],
+                    xerr=(energy_center_plot - e_bins['energy_bins'][skip_bins_first:len(e_bins)-1-skip_bins_last], e_bins['energy_bins'][skip_bins_first+1:len(e_bins)-skip_bins_last] - energy_center_plot),
+                    yerr=(table_plot['energy_res'] - table_plot['energy_res_err_lo'], table_plot['energy_res_err_hi'] - table_plot['energy_res']),
                     fmt=marker,
                     label=label,
                     markersize=marker_size
@@ -479,9 +503,13 @@ def plot_energy_resolution(
                 plot_preliminary(ax=axes[0])
 
             for table, label, marker in zip(e_tables, labels, markers):
-                axes[0].errorbar(energy_center, 
-                                 table['energy_bias'], 
-                                 xerr=(energy_center - e_bins['energy_bins'][:-1], e_bins['energy_bins'][1:] - energy_center), 
+
+                energy_center_plot = energy_center[skip_bins_first:len(energy_center)-skip_bins_last]
+                table_plot = table[skip_bins_first:len(energy_center)-skip_bins_last]
+
+                axes[0].errorbar(energy_center_plot, 
+                                 table_plot['energy_bias'], 
+                                 xerr=(energy_center_plot - e_bins['energy_bins'][skip_bins_first:len(e_bins)-1-skip_bins_last], e_bins['energy_bins'][skip_bins_first+1:len(e_bins)-skip_bins_last] - energy_center_plot),
                                  fmt=marker, 
                                  label=label,
                                   markersize=marker_size
@@ -503,7 +531,8 @@ def plot_energy_resolution(
 
 def plot_angular_resolution(
         e_bins, a_tables=None, labels=None, 
-        markers=None, ax=None, preliminary=False):
+        markers=None, ax=None, preliminary=False,
+        skip_bins_first=0, skip_bins_last=0):
     """
     Plots energy resolution and bias.
 
@@ -518,6 +547,10 @@ def plot_angular_resolution(
         Axis to plot the figure in 
     preliminary: bool
         Add preliminary watermark
+    skip_bins_first: float
+        Skip certain number of first bins, e.g. with very low number of events
+    skip_bins_last: float
+        Skip certain number of last bins
 
     Returns
     -------
@@ -534,10 +567,14 @@ def plot_angular_resolution(
         plot_preliminary(ax=ax)
 
     for table, label, marker in zip(a_tables, labels, markers):
-        ax.errorbar(energy_center, 
-                    table['angular_res'], 
-                    xerr=(energy_center - e_bins['energy_bins'][:-1], e_bins['energy_bins'][1:] - energy_center),
-                    yerr=(table['angular_res'] - table['angular_res_err_lo'], table['angular_res_err_hi'] - table['angular_res']),
+        
+        energy_center_plot = energy_center[skip_bins_first:len(energy_center)-skip_bins_last]
+        table_plot = table[skip_bins_first:len(energy_center)-skip_bins_last]
+        
+        ax.errorbar(energy_center_plot, 
+                    table_plot['angular_res'], 
+                    xerr=(energy_center_plot - e_bins['energy_bins'][skip_bins_first:len(e_bins)-1-skip_bins_last], e_bins['energy_bins'][skip_bins_first+1:len(e_bins)-skip_bins_last] - energy_center_plot),
+                    yerr=(table_plot['angular_res'] - table_plot['angular_res_err_lo'], table_plot['angular_res_err_hi'] - table_plot['angular_res']),
                     fmt=marker, 
                     markersize=marker_size,
                     label=label)
@@ -607,7 +644,8 @@ def plot_roc(
 def plot_sensitivity(
         sens_tables=None, labels=None, markers=None, 
         ax=None, xlim=[10**-1, 10**3], ylim=[10**-12, 10**-10], 
-        bands=False, yerrors=False, preliminary=False):
+        bands=False, yerrors=False, preliminary=False,
+        legend_fontsize=10):
     """
     Plots energy resolution and bias.
 
@@ -627,6 +665,8 @@ def plot_sensitivity(
         Plot uncertainties
     preliminary: bool
         Add preliminary watermark
+    legend_fontsize: int
+        Legend font size
 
     Returns
     -------
@@ -675,7 +715,7 @@ def plot_sensitivity(
     ax.grid(True, which='both')
     ax.set_xlim(xlim)
     ax.set_ylim(ylim)
-    plt.legend()
+    plt.legend(fontsize=legend_fontsize)
 
 
 def get_auc(table):
@@ -826,6 +866,93 @@ def plot_hawc_sens(ax=None):
     energy = sens[:, 0] * u.GeV
     diff_sens = sens[:, 1] * u.erg / (u.cm ** 2 * u.s)
     ax.plot(energy.to(u.TeV), diff_sens.to(u.TeV / (u.cm ** 2 * u.s)), label='HAWC (1yr)')
+
+
+def plot_veritas_sens(ax=None):
+    """
+    Plot VERITAS sensitivity from Fig 22 in
+    https://ui.adsabs.harvard.edu/abs/2020NCimR..43..281C/abstract
+
+    Parameters
+    ----------
+    ax: matplotlib.axes._axes.Axes
+        Axis to plot the figure in 
+
+    Returns
+    -------
+
+    """
+
+    sens = np.array(
+        [[0.13445071561209565, 2.7989765487454044e-12],
+        [0.17295336993434499, 1.8696066912593394e-12],
+        [0.1935506561970808, 1.6434612156435331e-12],
+        [0.2612780744931726, 1.1740721737263156e-12],
+        [0.2939649289555213, 1.0613730003060555e-12],
+        [0.43234932738121645, 8.29297135071508e-13],
+        [0.48643782894575727, 7.66682880180691e-13],
+        [0.7348543677167647, 6.16050434416116e-13],
+        [0.8446982037963724, 6.057315536295814e-13],
+        [1.3319593877373204, 6.368801273889653e-13],
+        [1.5642242378556541, 6.512497889588396e-13],
+        [2.4665414804650796, 6.9245455429238e-13],
+        [2.8200822827770358, 7.080896571438344e-13],
+        [4.375930237948393, 8.143281310482352e-13],
+        [5.00315256501573, 8.956257737944712e-13],
+        [7.358393581016099, 1.1521624697566649e-12],
+        [8.323433257799676, 1.267195729052601e-12],
+        [12.307467645029151, 1.5762710035213683e-12]]
+        )
+
+    energy = sens[:, 0] * u.TeV
+    sens = sens[:, 1] * u.erg * u.cm**-2 * u.s**-1
+    ax.plot(energy.to(u.TeV), sens.to(u.TeV / (u.cm ** 2 * u.s)), label='VERITAS (50h)')
+
+
+def plot_hess_sens(ax=None):
+    """
+    Plot H.E.S.S. sensitivity from Fig 22 in
+    https://ui.adsabs.harvard.edu/abs/2020NCimR..43..281C/abstract
+
+    Parameters
+    ----------
+    ax: matplotlib.axes._axes.Axes
+        Axis to plot the figure in 
+
+    Returns
+    -------
+
+    """
+
+    sens = np.array(
+        [
+            [0.20568922865735784, 2.6463988455392184e-12],
+            [0.2275964287543443, 1.999183315947727e-12],
+            [0.2518631968873063, 1.5795681488794446e-12],
+            [0.2847625062147546, 1.255047521897012e-12],
+            [0.345198305137716, 9.9719931890071e-13],
+            [0.4141274799274541, 9.065026168181143e-13],
+            [0.5049282682962686, 8.618755879418285e-13],
+            [0.6254886560364484, 7.491059385323583e-13],
+            [0.800195192466779, 6.621403604501413e-13],
+            [1.0573844506855754, 6.402266371250526e-13],
+            [1.3749261230006593, 6.155755533998118e-13],
+            [1.787781601804662, 5.852708333830761e-13],
+            [2.168650543699582, 6.190381546984956e-13],
+            [2.520548717686202, 6.925298375355217e-13],
+            [2.9613214549236844, 7.967825779923441e-13],
+            [3.5732747234716133, 8.715989270799347e-13],
+            [4.747632044258728, 8.814319610804054e-13],
+            [5.979922560466048, 9.750744098492465e-13],
+            [7.413055700272808, 1.1537703301130702e-12]
+        ]
+    )
+
+    energy = sens[:, 0] * u.TeV
+    sens = sens[:, 1] * u.erg * u.cm**-2 * u.s**-1
+    ax.plot(energy.to(u.TeV), sens.to(u.TeV / (u.cm ** 2 * u.s)), label='H.E.S.S. (50h)')
+
+
 
 
 def plot_astri_sens(ax=None):

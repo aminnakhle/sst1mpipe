@@ -1226,9 +1226,12 @@ def load_more_dl2_files(files, config=None, gammaness_cut=None):
                         tel_mc = 'tel_002'
                     else:
                         tel_mc = tel_setup
-                    cut_file = glob.glob(gammaness_cut + '/' + RF_used + '/gammaness_cuts_*' + tel_mc + '*.h5')[0]
-                    logging.info('Energy dendent cut table used: {}'.format(cut_file))
-                    cut_table = read_table_hdf5(cut_file, path='gammaness_cuts')
+                    try:
+                        cut_file = glob.glob(gammaness_cut + '/' + RF_used + '/gammaness_cuts_*' + tel_mc + '*.h5')[0]
+                        logging.info('Energy dendent cut table used: {}'.format(cut_file))
+                        cut_table = read_table_hdf5(cut_file, path='gammaness_cuts')
+                    except:
+                        logging.warning("Cannot read gammaness cut file in the path: {}".format(gammaness_cut))
 
                     # This works only on pandas dataframe
                     df0_table = Table.from_pandas(df0)
