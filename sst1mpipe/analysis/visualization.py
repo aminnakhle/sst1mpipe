@@ -381,7 +381,7 @@ def plot_mc_data(data=None, mc=None, scale=1):
 
 def plot_preliminary(ax=None, fontsize=60):
     ax.text(0.5, 0.5, 'PRELIMINARY', transform=ax.transAxes,
-        fontsize=fontsize, color='red', alpha=0.15,
+        fontsize=fontsize, color='grey', alpha=0.3,
         ha='center', va='center', rotation=30)
 
 
