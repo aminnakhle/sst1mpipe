@@ -383,9 +383,6 @@ def main():
                             containers=[event.mon.tel[tel].pedestal],
                         )
 
-                    
-                    
-
                 elif not pedestal_info.pedestals_in_file:
 
                     clenaning_mask = event.dl1.tel[tel].image_mask
