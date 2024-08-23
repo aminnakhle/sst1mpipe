@@ -445,7 +445,7 @@ def plot_energy_resolution(
             axes[1].errorbar(energy_center_plot, 
                     table_plot['energy_bias'], 
                     xerr=(energy_center_plot - e_bins['energy_bins'][skip_bins_first:len(e_bins)-1-skip_bins_last], e_bins['energy_bins'][skip_bins_first+1:len(e_bins)-skip_bins_last] - energy_center_plot),
-                    fmt='o', 
+                    fmt=marker, 
                     label=label
                     )
 
