@@ -508,7 +508,7 @@ def main():
             ax2.legend()
             ax2.set_title('Rates of reconstructed events', fontsize=16)
 
-        if is_dl1 
+        if is_dl1:
             ax3.grid()
             ax3.legend()
             ax3.set_xlabel('Time [UTC]')
