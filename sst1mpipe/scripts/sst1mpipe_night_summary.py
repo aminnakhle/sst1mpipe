@@ -227,6 +227,41 @@ def get_distributions(dist_path=None, data_store=None):
 
     return histograms, histograms_diff, zeniths, obsids_sorted, livetimes, survived_ped, bins
 
+
+def get_min_max_times(dl1_files, tel=None, config=None, stereo=False):
+
+    print(dl1_files[0])
+    print(dl1_files[-1])
+    dl1_files = np.sort(dl1_files)
+    ind = 0
+    first_loaded = False
+    while not first_loaded:
+        try:
+            df = load_dl1_sst1m(dl1_files[ind], tel=tel, config=config, table='pandas', stereo=stereo)
+            first_loaded = True
+        except:
+            print('Broken file')
+            ind += 1
+            if ind > 50: 
+                first_loaded = True
+                print('Something is really wrong, too many broken files!')
+    min_time = min(df['local_time'])
+    ind = 0
+    last_loaded = False
+    while not last_loaded:
+        try:
+            df = load_dl1_sst1m(dl1_files[len(dl1_files)-ind], tel=tel, config=config, table='pandas', stereo=stereo)
+            last_loaded = True
+        except:
+            print('Broken file')
+            ind += 1
+            if ind > 50: 
+                last_loaded = True
+                print('Something is really wrong, too many broken files!')
+    max_time = max(df['local_time'])
+    return min_time, max_time
+
+
 def main():
 
     args = parse_args()
@@ -273,6 +308,34 @@ def main():
         median1 = []
         median2 = []
 
+        rate_colors = {'tel_021':'blue', 'tel_022':'orange', 'stereo':'green'}
+
+        # making DL1 time bins
+        bunch_size = 20 # N of files
+        for telescope in ['cs1', 'cs2']:
+            base_path_source = base_path + '/' + date + '/' + source+'/' + telescope
+            dl1_path = base_path_source + '/DL1/' + version
+            is_dl1 = len(glob.glob(dl1_path+'/'+'*.h5'))
+            if telescope == 'cs1':
+                if is_dl1:
+                    dl1_files = make_file_list(dl1_path, stereo=False, level='dl1')
+                    tel1_min, tel1_max = get_min_max_times(dl1_files, tel='tel_021', config=config)
+                else:
+                    tel1_min = 1e15
+                    tel1_max = 0
+            elif telescope == 'cs2':
+                if is_dl1:
+                    dl1_files = make_file_list(dl1_path, stereo=False, level='dl1')
+                    tel2_min, tel2_max = get_min_max_times(dl1_files, tel='tel_022', config=config)
+                else:
+                    tel2_min = 1e15
+                    tel2_max = 0
+    
+        min_time_dl1 = min([tel1_min, tel2_min])
+        max_time_dl1 = max([tel1_max, tel2_max])
+        dl1_rate_bins = np.linspace(min_time_dl1, max_time_dl1, int((max_time_dl1-min_time_dl1)/10.))
+        print(min_time_dl1, max_time_dl1)
+
         for telescope in tels:
 
             # Load all files
@@ -308,13 +371,110 @@ def main():
                 tt = 0
 
             if is_dl1:
+                # We load and plot DL1 rates in bunches of file, 
+                # because otherwise it needs too much memory and
+                # is realy slow.
+                N_bunches = int(len(dl1_files)/bunch_size)
                 if tel != 'stereo':
-                    dl1, ped_table = load_files(dl1_files, tel=tel, level='dl1')
+                    h_tot = np.zeros(len(dl1_rate_bins)-1)
+                    for i in range(N_bunches):
+                        print('BUNCH', i)
+                        dl1, ped_table = load_files(dl1_files[i*bunch_size:bunch_size*(i+1)], tel=tel, level='dl1')
+                        # Trigger rates
+                        h1 = np.histogram(dl1.local_time, bins=dl1_rate_bins)
+                        h_tot += h1[0]
+                        # pedestal table
+                        plot_average_nsb_VS_time(ped_table,tt,ax=ax3, color=rate_colors[tel])
+                    # last bunch
+                    dl1, ped_table = load_files(dl1_files[bunch_size*(i+1):], tel=tel, level='dl1')
+                    h1 = np.histogram(dl1.local_time, bins=dl1_rate_bins)
+                    h_tot += h1[0]
+                    centers = (dl1_rate_bins[1:]+dl1_rate_bins[:-1]) / 2
+                    ax.plot(centers, h_tot/10, label=tel, alpha=0.7, color=rate_colors[tel])
+                    ax1.plot(centers, h_tot/10, label=tel, alpha=0.7, color=rate_colors[tel])
+                    median1.append(np.median(h_tot/10.))
+                    # pedestal table
+                    plot_average_nsb_VS_time(ped_table,tt,ax=ax3, color=rate_colors[tel], label=tel)
                 else:
-                    dl1_stereo_1,_ = load_files(dl1_files, tel='tel_021', level='dl1', stereo=stereo)
-                    dl1_stereo_2,_ = load_files(dl1_files, tel='tel_022', level='dl1', stereo=stereo)
+                    h_tot = np.zeros(len(dl1_rate_bins)-1)
+                    for i in range(N_bunches):
+                        dl1_stereo_1,_ = load_files(dl1_files[i*bunch_size:bunch_size*(i+1)], tel='tel_021', level='dl1', stereo=stereo)
+                        dl1_stereo_2,_ = load_files(dl1_files[i*bunch_size:bunch_size*(i+1)], tel='tel_022', level='dl1', stereo=stereo)
+                        # Trigger rates
+                        h1 = np.histogram(dl1_stereo_1.local_time, bins=dl1_rate_bins)
+                        h_tot += h1[0]
+                        
+                    # last bunch
+                    dl1_stereo_1,_ = load_files(dl1_files[bunch_size*(i+1):], tel='tel_021', level='dl1', stereo=stereo)
+                    dl1_stereo_2,_ = load_files(dl1_files[bunch_size*(i+1):], tel='tel_022', level='dl1', stereo=stereo)
+                    h1 = np.histogram(dl1_stereo_1.local_time, bins=dl1_rate_bins)
+                    h_tot += h1[0]
+                    centers = (dl1_rate_bins[1:]+dl1_rate_bins[:-1]) / 2
+                    ax.plot(centers, h_tot/10, label=tel, alpha=0.7, color=rate_colors[tel])
+                    ax1.plot(centers, h_tot/10, label=tel, alpha=0.7, color=rate_colors[tel])
+                    median1.append(np.median(h_tot/10.))
+
             if is_dl2:
-                dl2,_ = load_files(dl2_files, tel=tel, level='dl2')
+                # Reconstructed event rates (zoomed)
+                h_tot = np.zeros(len(dl1_rate_bins)-1)
+                zeniths_all = np.zeros(50)
+                local_time = []
+                zenith_time = []
+                time_all = []
+                moon_altaz_all = []
+                moon_separation_all = []
+                moon_phase_angle_all = []
+                N_bunches = int(len(dl2_files)/bunch_size)
+                for i in range(N_bunches):
+                    print('BUNCH', i)
+                    dl2,_ = load_files(dl2_files[i*bunch_size:bunch_size*(i+1)], tel=tel, level='dl2')
+                    h1 = np.histogram(dl2.local_time, bins=dl1_rate_bins)
+                    h_tot += h1[0]
+
+                    # Zenith angles
+                    if tel != 'stereo':
+                        zenith = 90-dl2['true_alt_tel']
+                        h1 = np.histogram(zenith, bins=50, range=[0, 65])
+                        zeniths_all += h1[0]
+                        local_time.append(np.array(dl2['local_time'].T))
+                        zenith_time.append(np.array(zenith.T))
+
+                    # moon
+                    if tel == 'tel_021':
+                        time, moon_altaz, moon_separation, moon_phase_angle = get_moon_params(dl2, config=config, tel=tel, thinning=100)
+                        time_all.append(np.array(time.unix))
+                        moon_altaz_all.append(np.array(moon_altaz.alt.to_value(u.deg)))
+                        moon_separation_all.append(np.array(moon_separation.to_value(u.deg)))
+                        moon_phase_angle_all.append(np.array(moon_phase_angle.to_value(u.deg)))
+
+                # last bunch
+                dl2,_ = load_files(dl2_files[bunch_size*(i+1):], tel=tel, level='dl2')
+                h1 = np.histogram(dl2.local_time, bins=dl1_rate_bins)
+                h_tot += h1[0]
+                centers = (dl1_rate_bins[1:]+dl1_rate_bins[:-1]) / 2
+                ax2.plot(centers, h_tot/10., alpha=0.7, label=tel, color=rate_colors[tel])
+                median2.append(np.median(h_tot/10.))
+                if tel != 'stereo':
+                    zenith = 90-dl2['true_alt_tel']
+                    h1 = np.histogram(zenith, bins=50, range=[0, 65])
+                    zeniths_all += h1[0]
+                    local_time.append(np.array(dl2['local_time'].T))
+                    zenith_time.append(np.array(zenith.T))
+                    ax7[0].step(np.linspace(0, 65, 50), zeniths_all, alpha=0.5, label=tel, where='mid')
+                    local_time = np.array(local_time)
+                    zenith_time = np.array(zenith_time)
+                    ax7[1].plot(np.concatenate(local_time), np.concatenate(zenith_time), '.', label=tel, alpha=0.7)
+                if tel == 'tel_021':
+                    time, moon_altaz, moon_separation, moon_phase_angle = get_moon_params(dl2, config=config, tel=tel, thinning=100)
+                    time_all.append(np.array(time.unix))
+                    moon_altaz_all.append(np.array(moon_altaz.alt.to_value(u.deg)))
+                    moon_separation_all.append(np.array(moon_separation.to_value(u.deg)))
+                    moon_phase_angle_all.append(np.array(moon_phase_angle.to_value(u.deg)))
+
+                    ax11.plot(np.concatenate(time_all), np.concatenate(moon_altaz_all), label='Moon alt')
+                    ax11.plot(np.concatenate(time_all), np.concatenate(moon_separation_all), label='Moon sep')
+                    ax11.plot(np.concatenate(time_all), np.concatenate(moon_phase_angle_all), label='Moon phase (full=0)')
+
             # DL3 Datastore
             if is_dl3:
                 data_store = DataStore.from_dir(dl3_path)
@@ -322,36 +482,6 @@ def main():
                 histograms, histograms_diff, _, _, livetimes, survived_ped, bins = get_distributions(dist_path=dist_path, data_store=data_store)
 
             # PLOTTING
-
-            # Trigger rates
-            if is_dl1:
-                if tel != 'stereo':
-                    h1 = np.histogram(dl1.local_time, bins=int((max(dl1.local_time)-min(dl1.local_time))/10.))
-                else:
-                    h1 = np.histogram(dl1_stereo_1.local_time, bins=int((max(dl1_stereo_1.local_time)-min(dl1_stereo_1.local_time))/10.))
-                centers = (h1[1][1:]+h1[1][:-1]) / 2
-                ax.plot(centers, h1[0]/10, label=tel, alpha=0.7)
-
-            # Trigger rates (zoom)
-            if is_dl1:
-                if tel != 'stereo':
-                    h1 = np.histogram(dl1.local_time, bins=int((max(dl1.local_time)-min(dl1.local_time))/10.))
-                else:
-                    h1 = np.histogram(dl1_stereo_1.local_time, bins=int((max(dl1_stereo_1.local_time)-min(dl1_stereo_1.local_time))/10.))
-                centers = (h1[1][1:]+h1[1][:-1]) / 2
-                ax1.plot(centers, h1[0]/10, label=tel, alpha=0.7)
-                median1.append(np.median(h1[0]/10.))
-
-            # Reconstructed event rates (zoomed)
-            if is_dl2:
-                h1 = np.histogram(dl2.local_time, bins=int((max(dl2.local_time)-min(dl2.local_time))/10.))
-                centers = (h1[1][1:]+h1[1][:-1]) / 2
-                ax2.plot(centers, h1[0]/10., label=tel, alpha=0.7)
-                median2.append(np.median(h1[0]/10.))
-
-            # NSB
-            if is_dl1 and (tel != "stereo"):
-                plot_average_nsb_VS_time(ped_table,tt,ax=ax3)
 
             # Distributions
             if is_dist and (tt==21):
@@ -408,15 +538,11 @@ def main():
             # Zenith angles
             if is_dl2 and (tel != "stereo"):
                 fig7.suptitle("Distribution of zenith angles", fontsize=16)
-
-                ax7[0].hist(90-dl2['true_alt_tel'], bins=20, range=[0, 65], alpha=0.5, label=tel)
                 ax7[0].set_xlabel('zenith [deg]')
                 ax7[0].grid()
                 ax7[0].set_ylabel('N reconstructed events')
                 ax7[0].grid()
                 ax7[0].legend()
-
-                ax7[1].plot(dl2['local_time'], 90-dl2['true_alt_tel'], '.', label=tel, alpha=0.7)
                 ax7[1].set_xlabel('local_time [s]')
                 ax7[1].set_ylabel('zenith [deg]')
                 ax7[1].grid()
@@ -425,6 +551,7 @@ def main():
 
             # CoGs
             # DL1 mono, survived cleaning
+            """
             fig8.suptitle("CoG of DL1 mono events", fontsize=16)
             if is_dl1 and (tt == 21):
                 h = ax8[0].hist2d(dl1['camera_frame_hillas_x'].dropna(), dl1['camera_frame_hillas_y'].dropna(), bins=100)
@@ -433,7 +560,7 @@ def main():
             if is_dl1 and (tt == 22):
                 h = ax8[1].hist2d(dl1['camera_frame_hillas_x'].dropna(), dl1['camera_frame_hillas_y'].dropna(), bins=100)
                 ax8[1].set_title(tel)
-
+            
             # DL2 mono
             # Gammas
             fig9.suptitle("CoG of DL2 mono events, gammaness > 0.7", fontsize=16)
@@ -453,13 +580,10 @@ def main():
                 fig10.suptitle("CoG of DL1 stereo events", fontsize=16)
                 ax10[0].set_title('tel1')
                 ax10[1].set_title('tel2')
-            
+            """
+
             # Moon
             if is_dl2 and (tt == 21):
-                time, moon_altaz, moon_separation, moon_phase_angle = get_moon_params(dl2, config=config, tel=tel, thinning=100)
-                ax11.plot(time.unix, moon_altaz.alt.to_value(u.deg), label='Moon alt')
-                ax11.plot(time.unix, moon_separation.to_value(u.deg), label='Moon sep')
-                ax11.plot(time.unix, moon_phase_angle.to_value(u.deg), label='Moon phase (full=0)')
                 ax11.grid()
                 ax11.set_ylabel('deg')
                 ax11.set_xlabel('local_time [s]')
@@ -508,7 +632,7 @@ def main():
             ax2.legend()
             ax2.set_title('Rates of reconstructed events', fontsize=16)
 
-        if is_dl1 
+        if is_dl1:
             ax3.grid()
             ax3.legend()
             ax3.set_xlabel('Time [UTC]')

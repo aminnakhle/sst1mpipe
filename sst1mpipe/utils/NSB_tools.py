@@ -224,12 +224,12 @@ def get_ped_table_low_res(file_list):
     return bline_table
 
 
-def plot_average_nsb_VS_time(ped_table,ntel,ax=None):
+def plot_average_nsb_VS_time(ped_table,ntel,ax=None, color='blue', label=None):
     NSB = VAR_to_NSB(ped_table['pedestal_charge_std'].mean(axis=1)**2,ntel)
     Dates = [Time(t,scale='utc',format='unix').to_datetime() for t in  ped_table['pedestal_sample_time']]
     if ax is None:
         f,ax = plt.subplots(figsize=(10,5))
-    ax.plot(Dates,NSB,'.',label='tel {}'.format(ntel%20))
+    ax.plot(Dates,NSB,'.',label=label, color=color)
     plt.xlabel('Time')
     plt.ylabel('NSB [MHz]')
     return ax
