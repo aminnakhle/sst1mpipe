@@ -106,6 +106,7 @@ def load_dl1_pedestals(input_file):
 def load_files(files, config=None, tel=None, level='dl1', stereo=False):
     i = 0
     ped_table = []
+    data = []
 
     for input_file in files:
         try:
@@ -316,6 +317,11 @@ def main():
             base_path_source = base_path + '/' + date + '/' + source+'/' + telescope
             dl1_path = base_path_source + '/DL1/' + version
             is_dl1 = len(glob.glob(dl1_path+'/'+'*.h5'))
+            # handle lower case directories
+            if not is_dl1:
+                dl1_path = base_path_source + '/dl1/' + version
+                is_dl1 = len(glob.glob(dl1_path+'/'+'*.h5'))
+
             if telescope == 'cs1':
                 if is_dl1:
                     dl1_files = make_file_list(dl1_path, stereo=False, level='dl1')
@@ -350,6 +356,17 @@ def main():
             is_dl3 = len(glob.glob(dl3_path+'/'+'*.fits'))
             is_dist = len(glob.glob(dist_path+'/'+'*.h5'))
 
+            # handle low case directories
+            if not is_dl1:
+                dl1_path = base_path_source + '/dl1/' + version
+                is_dl1 = len(glob.glob(dl1_path+'/'+'*.h5'))
+            if not is_dl2:
+                dl2_path = base_path_source + '/dl2/' + version
+                is_dl2 = len(glob.glob(dl2_path+'/'+'*.h5'))
+            if not dl3_path:
+                dl3_path = base_path_source + '/dl3/' + version
+                is_dl3 = len(glob.glob(dl3_path+'/'+'*.fits'))
+
             if telescope not in 'stereo':
                 stereo=False
             else:
@@ -375,6 +392,8 @@ def main():
                 # because otherwise it needs too much memory and
                 # is realy slow.
                 N_bunches = int(len(dl1_files)/bunch_size)
+                h11_tot = np.zeros((100, 100))
+                h22_tot = np.zeros((100, 100))
                 if tel != 'stereo':
                     h_tot = np.zeros(len(dl1_rate_bins)-1)
                     for i in range(N_bunches):
@@ -385,6 +404,13 @@ def main():
                         h_tot += h1[0]
                         # pedestal table
                         plot_average_nsb_VS_time(ped_table,tt,ax=ax3, color=rate_colors[tel])
+                        # CoGs - DL1 mono, survived cleaning
+                        if tel == 'tel_021':
+                            h11, xedges, yedges = np.histogram2d(dl1['camera_frame_hillas_x'].dropna(), dl1['camera_frame_hillas_y'].dropna(), bins=100, range=[[-0.5, 0.5], [-0.5, 0.5]])
+                            h11_tot += h11
+                        else:
+                            h22, xedges, yedges = np.histogram2d(dl1['camera_frame_hillas_x'].dropna(), dl1['camera_frame_hillas_y'].dropna(), bins=100, range=[[-0.5, 0.5], [-0.5, 0.5]])
+                            h22_tot += h22
                     # last bunch
                     dl1, ped_table = load_files(dl1_files[bunch_size*(i+1):], tel=tel, level='dl1')
                     h1 = np.histogram(dl1.local_time, bins=dl1_rate_bins)
@@ -395,28 +421,54 @@ def main():
                     median1.append(np.median(h_tot/10.))
                     # pedestal table
                     plot_average_nsb_VS_time(ped_table,tt,ax=ax3, color=rate_colors[tel], label=tel)
+                    # CoGs - DL1 mono, survived cleaning
+                    X, Y = np.meshgrid(xedges, yedges)
+                    if tel == 'tel_021':
+                        h11, xedges, yedges = np.histogram2d(dl1['camera_frame_hillas_x'].dropna(), dl1['camera_frame_hillas_y'].dropna(), bins=100, range=[[-0.5, 0.5], [-0.5, 0.5]])
+                        h11_tot += h11
+                        ax8[0].pcolormesh(X, Y, h11_tot)
+                    else:
+                        h22, xedges, yedges = np.histogram2d(dl1['camera_frame_hillas_x'].dropna(), dl1['camera_frame_hillas_y'].dropna(), bins=100, range=[[-0.5, 0.5], [-0.5, 0.5]])
+                        h22_tot += h22
+                        ax8[1].pcolormesh(X, Y, h22_tot)
                 else:
                     h_tot = np.zeros(len(dl1_rate_bins)-1)
                     for i in range(N_bunches):
                         dl1_stereo_1,_ = load_files(dl1_files[i*bunch_size:bunch_size*(i+1)], tel='tel_021', level='dl1', stereo=stereo)
                         dl1_stereo_2,_ = load_files(dl1_files[i*bunch_size:bunch_size*(i+1)], tel='tel_022', level='dl1', stereo=stereo)
                         # Trigger rates
-                        h1 = np.histogram(dl1_stereo_1.local_time, bins=dl1_rate_bins)
-                        h_tot += h1[0]
-                        
+                        if len(dl1_stereo_1) > 0:
+                            h1 = np.histogram(dl1_stereo_1.local_time, bins=dl1_rate_bins)
+                            h_tot += h1[0]
+                            # CoG - DL1 stereo, survived cleaning
+                            h11, xedges, yedges = np.histogram2d(dl1_stereo_1['camera_frame_hillas_x'].dropna(), dl1_stereo_1['camera_frame_hillas_y'].dropna(), bins=100, range=[[-0.5, 0.5], [-0.5, 0.5]])
+                            h22, xedges, yedges = np.histogram2d(dl1_stereo_2['camera_frame_hillas_x'].dropna(), dl1_stereo_2['camera_frame_hillas_y'].dropna(), bins=100, range=[[-0.5, 0.5], [-0.5, 0.5]])
+                            h11_tot += h11
+                            h22_tot += h22
+
                     # last bunch
                     dl1_stereo_1,_ = load_files(dl1_files[bunch_size*(i+1):], tel='tel_021', level='dl1', stereo=stereo)
                     dl1_stereo_2,_ = load_files(dl1_files[bunch_size*(i+1):], tel='tel_022', level='dl1', stereo=stereo)
-                    h1 = np.histogram(dl1_stereo_1.local_time, bins=dl1_rate_bins)
-                    h_tot += h1[0]
+                    if len(dl1_stereo_1) > 0:
+                        h1 = np.histogram(dl1_stereo_1.local_time, bins=dl1_rate_bins)
+                        h_tot += h1[0]
+                        h11, xedges, yedges = np.histogram2d(dl1_stereo_1['camera_frame_hillas_x'].dropna(), dl1_stereo_1['camera_frame_hillas_y'].dropna(), bins=100, range=[[-0.5, 0.5], [-0.5, 0.5]])
+                        h22, xedges, yedges = np.histogram2d(dl1_stereo_2['camera_frame_hillas_x'].dropna(), dl1_stereo_2['camera_frame_hillas_y'].dropna(), bins=100, range=[[-0.5, 0.5], [-0.5, 0.5]])
+                        h11_tot += h11
+                        h22_tot += h22
                     centers = (dl1_rate_bins[1:]+dl1_rate_bins[:-1]) / 2
                     ax.plot(centers, h_tot/10, label=tel, alpha=0.7, color=rate_colors[tel])
                     ax1.plot(centers, h_tot/10, label=tel, alpha=0.7, color=rate_colors[tel])
                     median1.append(np.median(h_tot/10.))
+                    X, Y = np.meshgrid(xedges, yedges)
+                    ax10[0].pcolormesh(X, Y, h11_tot)
+                    ax10[1].pcolormesh(X, Y, h22_tot)
 
             if is_dl2:
                 # Reconstructed event rates (zoomed)
                 h_tot = np.zeros(len(dl1_rate_bins)-1)
+                h11_tot = np.zeros((100, 100))
+                h22_tot = np.zeros((100, 100))
                 zeniths_all = np.zeros(50)
                 local_time = []
                 zenith_time = []
@@ -447,6 +499,15 @@ def main():
                         moon_separation_all.append(np.array(moon_separation.to_value(u.deg)))
                         moon_phase_angle_all.append(np.array(moon_phase_angle.to_value(u.deg)))
 
+                    # CoGs - DL2 mono, gammas
+                    mask1 = dl2['gammaness'] > 0.7
+                    if tel == 'tel_021':
+                        h11, xedges, yedges = np.histogram2d(dl2[mask1]['camera_frame_hillas_x'].dropna(), dl2[mask1]['camera_frame_hillas_y'].dropna(), bins=100, range=[[-0.5, 0.5], [-0.5, 0.5]])
+                        h11_tot += h11
+                    elif tel == 'tel_022':
+                        h22, xedges, yedges = np.histogram2d(dl2[mask1]['camera_frame_hillas_x'].dropna(), dl2[mask1]['camera_frame_hillas_y'].dropna(), bins=100, range=[[-0.5, 0.5], [-0.5, 0.5]])
+                        h22_tot += h22
+
                 # last bunch
                 dl2,_ = load_files(dl2_files[bunch_size*(i+1):], tel=tel, level='dl2')
                 h1 = np.histogram(dl2.local_time, bins=dl1_rate_bins)
@@ -474,6 +535,17 @@ def main():
                     ax11.plot(np.concatenate(time_all), np.concatenate(moon_altaz_all), label='Moon alt')
                     ax11.plot(np.concatenate(time_all), np.concatenate(moon_separation_all), label='Moon sep')
                     ax11.plot(np.concatenate(time_all), np.concatenate(moon_phase_angle_all), label='Moon phase (full=0)')
+                # CoGs - DL2 mono, gammas
+                X, Y = np.meshgrid(xedges, yedges)
+                mask1 = dl2['gammaness'] > 0.7
+                if tel == 'tel_021':
+                    h11, xedges, yedges = np.histogram2d(dl2[mask1]['camera_frame_hillas_x'].dropna(), dl2[mask1]['camera_frame_hillas_y'].dropna(), bins=100, range=[[-0.5, 0.5], [-0.5, 0.5]])
+                    h11_tot += h11
+                    ax9[0].pcolormesh(X, Y, h11_tot)
+                elif tel == 'tel_022':
+                    h22, xedges, yedges = np.histogram2d(dl2[mask1]['camera_frame_hillas_x'].dropna(), dl2[mask1]['camera_frame_hillas_y'].dropna(), bins=100, range=[[-0.5, 0.5], [-0.5, 0.5]])
+                    h22_tot += h22
+                    ax9[1].pcolormesh(X, Y, h22_tot)
 
             # DL3 Datastore
             if is_dl3:
@@ -551,36 +623,25 @@ def main():
 
             # CoGs
             # DL1 mono, survived cleaning
-            """
             fig8.suptitle("CoG of DL1 mono events", fontsize=16)
             if is_dl1 and (tt == 21):
-                h = ax8[0].hist2d(dl1['camera_frame_hillas_x'].dropna(), dl1['camera_frame_hillas_y'].dropna(), bins=100)
-                ax8[0].set_title(tel)
-
+                ax8[0].set_title('tel_021')
             if is_dl1 and (tt == 22):
-                h = ax8[1].hist2d(dl1['camera_frame_hillas_x'].dropna(), dl1['camera_frame_hillas_y'].dropna(), bins=100)
-                ax8[1].set_title(tel)
+                ax8[1].set_title('tel_022')
             
             # DL2 mono
             # Gammas
             fig9.suptitle("CoG of DL2 mono events, gammaness > 0.7", fontsize=16)
             if is_dl2 and (tt == 21):
-                mask1 = dl2['gammaness'] > 0.7
-                h = ax9[0].hist2d(dl2['camera_frame_hillas_x'][mask1].dropna(), dl2['camera_frame_hillas_y'][mask1].dropna(), bins=100)
                 ax9[0].set_title(tel)
             if is_dl2 and (tt == 22):
-                mask1 = dl2['gammaness'] > 0.7
-                h = ax9[1].hist2d(dl2['camera_frame_hillas_x'][mask1].dropna(), dl2['camera_frame_hillas_y'][mask1].dropna(), bins=100)
                 ax9[1].set_title(tel)
 
             # DL1 stereo, survived cleaning
             if is_dl1 and (tt == 0):
-                h = ax10[0].hist2d(dl1_stereo_1['camera_frame_hillas_x'].dropna(), dl1_stereo_1['camera_frame_hillas_y'].dropna(), bins=100)
-                h = ax10[1].hist2d(dl1_stereo_2['camera_frame_hillas_x'].dropna(), dl1_stereo_2['camera_frame_hillas_y'].dropna(), bins=100)
                 fig10.suptitle("CoG of DL1 stereo events", fontsize=16)
                 ax10[0].set_title('tel1')
                 ax10[1].set_title('tel2')
-            """
 
             # Moon
             if is_dl2 and (tt == 21):
