@@ -353,7 +353,6 @@ def main():
         min_time_dl1 = min([tel1_min, tel2_min])
         max_time_dl1 = max([tel1_max, tel2_max])
         dl1_rate_bins = np.linspace(min_time_dl1, max_time_dl1, int((max_time_dl1-min_time_dl1)/10.))
-        print(min_time_dl1, max_time_dl1)
 
         for telescope in tels:
 
@@ -413,36 +412,41 @@ def main():
                         print('BUNCH', i)
                         dl1, ped_table = load_files(dl1_files[i*bunch_size:bunch_size*(i+1)], tel=tel, level='dl1')
                         # Trigger rates
-                        h1 = np.histogram(dl1.local_time, bins=dl1_rate_bins)
-                        h_tot += h1[0]
-                        # pedestal table
-                        plot_average_nsb_VS_time(ped_table,tt,ax=ax3, color=rate_colors[tel])
-                        # CoGs - DL1 mono, survived cleaning
-                        if tel == 'tel_021':
-                            h11, xedges, yedges = np.histogram2d(dl1['camera_frame_hillas_x'].dropna(), dl1['camera_frame_hillas_y'].dropna(), bins=100, range=[[-0.5, 0.5], [-0.5, 0.5]])
-                            h11_tot += h11
-                        else:
-                            h22, xedges, yedges = np.histogram2d(dl1['camera_frame_hillas_x'].dropna(), dl1['camera_frame_hillas_y'].dropna(), bins=100, range=[[-0.5, 0.5], [-0.5, 0.5]])
-                            h22_tot += h22
+                        if len(dl1) > 0:
+                            h1 = np.histogram(dl1.local_time, bins=dl1_rate_bins)
+                            h_tot += h1[0]
+                            # pedestal table
+                            plot_average_nsb_VS_time(ped_table,tt,ax=ax3, color=rate_colors[tel])
+                            # CoGs - DL1 mono, survived cleaning
+                            if tel == 'tel_021':
+                                h11, xedges, yedges = np.histogram2d(dl1['camera_frame_hillas_x'].dropna(), dl1['camera_frame_hillas_y'].dropna(), bins=100, range=[[-0.5, 0.5], [-0.5, 0.5]])
+                                h11_tot += h11
+                            else:
+                                h22, xedges, yedges = np.histogram2d(dl1['camera_frame_hillas_x'].dropna(), dl1['camera_frame_hillas_y'].dropna(), bins=100, range=[[-0.5, 0.5], [-0.5, 0.5]])
+                                h22_tot += h22
                     # last bunch
                     dl1, ped_table = load_files(dl1_files[bunch_size*(i+1):], tel=tel, level='dl1')
-                    h1 = np.histogram(dl1.local_time, bins=dl1_rate_bins)
-                    h_tot += h1[0]
+                    if len(dl1) > 0:
+                        h1 = np.histogram(dl1.local_time, bins=dl1_rate_bins)
+                        h_tot += h1[0]
                     centers = (dl1_rate_bins[1:]+dl1_rate_bins[:-1]) / 2
                     ax.plot(centers, h_tot/10, label=tel, alpha=0.7, color=rate_colors[tel])
                     ax1.plot(centers, h_tot/10, label=tel, alpha=0.7, color=rate_colors[tel])
                     median1.append(np.median(h_tot/10.))
                     # pedestal table
-                    plot_average_nsb_VS_time(ped_table,tt,ax=ax3, color=rate_colors[tel], label=tel)
-                    # CoGs - DL1 mono, survived cleaning
+                    if len(dl1) > 0:
+                        plot_average_nsb_VS_time(ped_table,tt,ax=ax3, color=rate_colors[tel], label=tel)
+                        # CoGs - DL1 mono, survived cleaning
                     X, Y = np.meshgrid(xedges, yedges)
                     if tel == 'tel_021':
-                        h11, xedges, yedges = np.histogram2d(dl1['camera_frame_hillas_x'].dropna(), dl1['camera_frame_hillas_y'].dropna(), bins=100, range=[[-0.5, 0.5], [-0.5, 0.5]])
-                        h11_tot += h11
+                        if len(dl1) > 0:
+                            h11, xedges, yedges = np.histogram2d(dl1['camera_frame_hillas_x'].dropna(), dl1['camera_frame_hillas_y'].dropna(), bins=100, range=[[-0.5, 0.5], [-0.5, 0.5]])
+                            h11_tot += h11
                         ax8[0].pcolormesh(X, Y, h11_tot)
                     else:
-                        h22, xedges, yedges = np.histogram2d(dl1['camera_frame_hillas_x'].dropna(), dl1['camera_frame_hillas_y'].dropna(), bins=100, range=[[-0.5, 0.5], [-0.5, 0.5]])
-                        h22_tot += h22
+                        if len(dl1) > 0:
+                            h22, xedges, yedges = np.histogram2d(dl1['camera_frame_hillas_x'].dropna(), dl1['camera_frame_hillas_y'].dropna(), bins=100, range=[[-0.5, 0.5], [-0.5, 0.5]])
+                            h22_tot += h22
                         ax8[1].pcolormesh(X, Y, h22_tot)
                 else:
                     h_tot = np.zeros(len(dl1_rate_bins)-1)
@@ -523,17 +527,19 @@ def main():
 
                 # last bunch
                 dl2,_ = load_files(dl2_files[bunch_size*(i+1):], tel=tel, level='dl2')
-                h1 = np.histogram(dl2.local_time, bins=dl1_rate_bins)
-                h_tot += h1[0]
+                if len(dl2) > 0:
+                    h1 = np.histogram(dl2.local_time, bins=dl1_rate_bins)
+                    h_tot += h1[0]
                 centers = (dl1_rate_bins[1:]+dl1_rate_bins[:-1]) / 2
                 ax2.plot(centers, h_tot/10., alpha=0.7, label=tel, color=rate_colors[tel])
                 median2.append(np.median(h_tot/10.))
                 if tel != 'stereo':
-                    zenith = 90-dl2['true_alt_tel']
-                    h1 = np.histogram(zenith, bins=50, range=[0, 65])
-                    zeniths_all += h1[0]
-                    local_time.append(np.array(dl2['local_time'].T))
-                    zenith_time.append(np.array(zenith.T))
+                    if len(dl2) > 0:
+                        zenith = 90-dl2['true_alt_tel']
+                        h1 = np.histogram(zenith, bins=50, range=[0, 65])
+                        zeniths_all += h1[0]
+                        local_time.append(np.array(dl2['local_time'].T))
+                        zenith_time.append(np.array(zenith.T))
                     ax7[0].step(np.linspace(0, 65, 50), zeniths_all, alpha=0.5, label=tel, where='mid')
                     local_time = np.array(local_time)
                     zenith_time = np.array(zenith_time)
@@ -550,14 +556,17 @@ def main():
                     ax11.plot(np.concatenate(time_all), np.concatenate(moon_phase_angle_all), label='Moon phase (full=0)')
                 # CoGs - DL2 mono, gammas
                 X, Y = np.meshgrid(xedges, yedges)
-                mask1 = dl2['gammaness'] > 0.7
+                if len(dl2) > 0:
+                    mask1 = dl2['gammaness'] > 0.7
                 if tel == 'tel_021':
-                    h11, xedges, yedges = np.histogram2d(dl2[mask1]['camera_frame_hillas_x'].dropna(), dl2[mask1]['camera_frame_hillas_y'].dropna(), bins=100, range=[[-0.5, 0.5], [-0.5, 0.5]])
-                    h11_tot += h11
+                    if len(dl2) > 0:
+                        h11, xedges, yedges = np.histogram2d(dl2[mask1]['camera_frame_hillas_x'].dropna(), dl2[mask1]['camera_frame_hillas_y'].dropna(), bins=100, range=[[-0.5, 0.5], [-0.5, 0.5]])
+                        h11_tot += h11
                     ax9[0].pcolormesh(X, Y, h11_tot)
                 elif tel == 'tel_022':
-                    h22, xedges, yedges = np.histogram2d(dl2[mask1]['camera_frame_hillas_x'].dropna(), dl2[mask1]['camera_frame_hillas_y'].dropna(), bins=100, range=[[-0.5, 0.5], [-0.5, 0.5]])
-                    h22_tot += h22
+                    if len(dl2) > 0:
+                        h22, xedges, yedges = np.histogram2d(dl2[mask1]['camera_frame_hillas_x'].dropna(), dl2[mask1]['camera_frame_hillas_y'].dropna(), bins=100, range=[[-0.5, 0.5], [-0.5, 0.5]])
+                        h22_tot += h22
                     ax9[1].pcolormesh(X, Y, h22_tot)
 
             # DL3 Datastore
