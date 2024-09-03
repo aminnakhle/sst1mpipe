@@ -62,11 +62,10 @@ def parse_args():
                         help='Base data analysis directory.'
                         )
     parser.add_argument(
-                        '--out-dir', '-d',
+                        '--out-dir', '-o',
                         dest='out_dir',
-                        required=True,
                         type=str,
-                        help='Output directory to store the night summary.'
+                        help='Output directory to store the night summary.',
                         default=''
                         )
 
@@ -86,7 +85,7 @@ def parse_args():
                         )
 
     parser.add_argument(
-                        '--subdir', '-s', type=str,
+                        '--sub-dir', '-s', type=str,
                         dest='version',
                         help='Sub directory for given data sample inside each data level directory, e.g. a version of sst1mpipe used (../DL{1,2,3}/v0.5.5/).',
                         default=''
@@ -280,6 +279,7 @@ def main():
     date = args.date
     config_file = args.config_file
     version = args.version
+    out_dir = args.out_dir
     if len(out_dir) > 0:
         outpath = out_dir
     else:
