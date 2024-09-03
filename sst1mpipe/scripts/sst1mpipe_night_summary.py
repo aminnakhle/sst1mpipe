@@ -353,7 +353,6 @@ def main():
         min_time_dl1 = min([tel1_min, tel2_min])
         max_time_dl1 = max([tel1_max, tel2_max])
         dl1_rate_bins = np.linspace(min_time_dl1, max_time_dl1, int((max_time_dl1-min_time_dl1)/10.))
-        print(min_time_dl1, max_time_dl1)
 
         for telescope in tels:
 
