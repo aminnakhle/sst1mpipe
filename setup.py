@@ -54,7 +54,7 @@ setup(
             'sst1mpipe_pointing_check = sst1mpipe.scripts.sst1mpipe_pointing_check:main',
             'rate_scans_extraction = sst1mpipe.scripts.rate_scans_extraction:main',
             'create_hdu_indexes = sst1mpipe.scripts.create_hdu_indexes:main',
-            'sst1mpipe_extract_dl1_distributions = sst1mpipe.scripts.sst1mpipe_extract_dl1_distributions:main'
+            'sst1mpipe_extract_dl1_distributions = sst1mpipe.scripts.sst1mpipe_extract_dl1_distributions:main',
             'sst1mpipe_night_summary = sst1mpipe.scripts.sst1mpipe_night_summary:main'
         ]
     }
