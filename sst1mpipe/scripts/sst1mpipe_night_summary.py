@@ -7,16 +7,17 @@ summary, the script needs all data analysis levels up to DL3 for
 mono and stereo to be already produced. It also needs the DL1 
 distributions to be already extracted.
 - Input is a base data analysis directory, within which the expected 
-structure is BASE_DIR/{date}/{source}/{telescope}/{data level}/{version}/
+structure is BASE_DIR/{date}/{source}/{telescope}/{data level}/{subdir}/
 - Outputs are night summary PDFs for all sources observed during the night
 
 Usage:
 
 $> python sst1mpipe_night_summary.py
 --base-dir /data/
+--out-dir /outputs/
 --date 20240810
 --config sst1mpipe_config.json
---version v0.5.5
+--sub-dir /v0.5.5/
 
 """
 
@@ -60,6 +61,14 @@ def parse_args():
                         type=str,
                         help='Base data analysis directory.'
                         )
+    parser.add_argument(
+                        '--out-dir', '-d',
+                        dest='out_dir',
+                        required=True,
+                        type=str,
+                        help='Output directory to store the night summary.'
+                        default=''
+                        )
 
     parser.add_argument(
                         '--date',
@@ -77,9 +86,9 @@ def parse_args():
                         )
 
     parser.add_argument(
-                        '--version', '-v', type=str,
+                        '--subdir', '-s', type=str,
                         dest='version',
-                        help='Version of sst1mpipe used to process data in the base directory.',
+                        help='Sub directory for given data sample inside each data level directory, e.g. a version of sst1mpipe used (../DL{1,2,3}/v0.5.5/).',
                         default=''
                         )
 
@@ -271,7 +280,11 @@ def main():
     date = args.date
     config_file = args.config_file
     version = args.version
-    outpath = base_path + '/' + date + '/'
+    if len(out_dir) > 0:
+        outpath = out_dir
+    else:
+        outpath = base_path + '/' + date + '/'
+        print('Default outpath used: %s', outpath)
 
     check_outdir(outpath)
 
