@@ -544,9 +544,9 @@ def main():
                         local_time.append(np.array(dl2['local_time'].T))
                         zenith_time.append(np.array(zenith.T))
                     ax7[0].step(np.linspace(0, 65, 50), zeniths_all, alpha=0.5, label=tel, where='mid')
-                    local_time = np.array(local_time)
-                    zenith_time = np.array(zenith_time)
-                    ax7[1].plot(np.concatenate(local_time), np.concatenate(zenith_time), '.', label=tel, alpha=0.7)
+                    local_time = np.concatenate(local_time)
+                    zenith_time = np.concatenate(zenith_time)
+                    ax7[1].plot(local_time, zenith_time, '.', label=tel, alpha=0.7)
                 if tel == 'tel_021':
                     if len(dl2) > 0:
                         time, moon_altaz, moon_separation, moon_phase_angle = get_moon_params(dl2, config=config, tel=tel, thinning=100)
