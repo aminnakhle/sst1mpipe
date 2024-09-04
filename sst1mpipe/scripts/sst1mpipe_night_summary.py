@@ -412,7 +412,7 @@ def main():
                         print('BUNCH', i)
                         dl1, ped_table = load_files(dl1_files[i*bunch_size:bunch_size*(i+1)], tel=tel, level='dl1')
                         # Trigger rates
-                        if len(dl1) > 0:
+                        if (len(dl1) > 0) and (len(ped_table) > 0):
                             h1 = np.histogram(dl1.local_time, bins=dl1_rate_bins)
                             h_tot += h1[0]
                             # pedestal table
@@ -434,7 +434,7 @@ def main():
                     ax1.plot(centers, h_tot/10, label=tel, alpha=0.7, color=rate_colors[tel])
                     median1.append(np.median(h_tot/10.))
                     # pedestal table
-                    if len(dl1) > 0:
+                    if len(ped_table) > 0:
                         plot_average_nsb_VS_time(ped_table,tt,ax=ax3, color=rate_colors[tel], label=tel)
                         # CoGs - DL1 mono, survived cleaning
                     X, Y = np.meshgrid(xedges, yedges)
@@ -454,7 +454,7 @@ def main():
                         dl1_stereo_1,_ = load_files(dl1_files[i*bunch_size:bunch_size*(i+1)], tel='tel_021', level='dl1', stereo=stereo)
                         dl1_stereo_2,_ = load_files(dl1_files[i*bunch_size:bunch_size*(i+1)], tel='tel_022', level='dl1', stereo=stereo)
                         # Trigger rates
-                        if len(dl1_stereo_1) > 0:
+                        if (len(dl1_stereo_1) > 0) and (len(dl1_stereo_2) > 0):
                             h1 = np.histogram(dl1_stereo_1.local_time, bins=dl1_rate_bins)
                             h_tot += h1[0]
                             # CoG - DL1 stereo, survived cleaning
@@ -466,7 +466,7 @@ def main():
                     # last bunch
                     dl1_stereo_1,_ = load_files(dl1_files[bunch_size*(i+1):], tel='tel_021', level='dl1', stereo=stereo)
                     dl1_stereo_2,_ = load_files(dl1_files[bunch_size*(i+1):], tel='tel_022', level='dl1', stereo=stereo)
-                    if len(dl1_stereo_1) > 0:
+                    if (len(dl1_stereo_1) > 0) and (len(dl1_stereo_2) > 0):
                         h1 = np.histogram(dl1_stereo_1.local_time, bins=dl1_rate_bins)
                         h_tot += h1[0]
                         h11, xedges, yedges = np.histogram2d(dl1_stereo_1['camera_frame_hillas_x'].dropna(), dl1_stereo_1['camera_frame_hillas_y'].dropna(), bins=100, range=[[-0.5, 0.5], [-0.5, 0.5]])
@@ -497,11 +497,12 @@ def main():
                 for i in range(N_bunches):
                     print('BUNCH', i)
                     dl2,_ = load_files(dl2_files[i*bunch_size:bunch_size*(i+1)], tel=tel, level='dl2')
-                    h1 = np.histogram(dl2.local_time, bins=dl1_rate_bins)
-                    h_tot += h1[0]
+                    if len(dl2) > 0:
+                        h1 = np.histogram(dl2.local_time, bins=dl1_rate_bins)
+                        h_tot += h1[0]
 
                     # Zenith angles
-                    if tel != 'stereo':
+                    if (tel != 'stereo') and (len(dl2) > 0):
                         zenith = 90-dl2['true_alt_tel']
                         h1 = np.histogram(zenith, bins=50, range=[0, 65])
                         zeniths_all += h1[0]
@@ -509,7 +510,7 @@ def main():
                         zenith_time.append(np.array(zenith.T))
 
                     # moon
-                    if tel == 'tel_021':
+                    if (tel == 'tel_021') and (len(dl2) > 0):
                         time, moon_altaz, moon_separation, moon_phase_angle = get_moon_params(dl2, config=config, tel=tel, thinning=100)
                         time_all.append(np.array(time.unix))
                         moon_altaz_all.append(np.array(moon_altaz.alt.to_value(u.deg)))
@@ -517,13 +518,14 @@ def main():
                         moon_phase_angle_all.append(np.array(moon_phase_angle.to_value(u.deg)))
 
                     # CoGs - DL2 mono, gammas
-                    mask1 = dl2['gammaness'] > 0.7
-                    if tel == 'tel_021':
-                        h11, xedges, yedges = np.histogram2d(dl2[mask1]['camera_frame_hillas_x'].dropna(), dl2[mask1]['camera_frame_hillas_y'].dropna(), bins=100, range=[[-0.5, 0.5], [-0.5, 0.5]])
-                        h11_tot += h11
-                    elif tel == 'tel_022':
-                        h22, xedges, yedges = np.histogram2d(dl2[mask1]['camera_frame_hillas_x'].dropna(), dl2[mask1]['camera_frame_hillas_y'].dropna(), bins=100, range=[[-0.5, 0.5], [-0.5, 0.5]])
-                        h22_tot += h22
+                    if len(dl2) > 0:
+                        mask1 = dl2['gammaness'] > 0.7
+                        if tel == 'tel_021':
+                            h11, xedges, yedges = np.histogram2d(dl2[mask1]['camera_frame_hillas_x'].dropna(), dl2[mask1]['camera_frame_hillas_y'].dropna(), bins=100, range=[[-0.5, 0.5], [-0.5, 0.5]])
+                            h11_tot += h11
+                        elif tel == 'tel_022':
+                            h22, xedges, yedges = np.histogram2d(dl2[mask1]['camera_frame_hillas_x'].dropna(), dl2[mask1]['camera_frame_hillas_y'].dropna(), bins=100, range=[[-0.5, 0.5], [-0.5, 0.5]])
+                            h22_tot += h22
 
                 # last bunch
                 dl2,_ = load_files(dl2_files[bunch_size*(i+1):], tel=tel, level='dl2')
@@ -545,11 +547,12 @@ def main():
                     zenith_time = np.array(zenith_time)
                     ax7[1].plot(np.concatenate(local_time), np.concatenate(zenith_time), '.', label=tel, alpha=0.7)
                 if tel == 'tel_021':
-                    time, moon_altaz, moon_separation, moon_phase_angle = get_moon_params(dl2, config=config, tel=tel, thinning=100)
-                    time_all.append(np.array(time.unix))
-                    moon_altaz_all.append(np.array(moon_altaz.alt.to_value(u.deg)))
-                    moon_separation_all.append(np.array(moon_separation.to_value(u.deg)))
-                    moon_phase_angle_all.append(np.array(moon_phase_angle.to_value(u.deg)))
+                    if len(dl2) > 0:
+                        time, moon_altaz, moon_separation, moon_phase_angle = get_moon_params(dl2, config=config, tel=tel, thinning=100)
+                        time_all.append(np.array(time.unix))
+                        moon_altaz_all.append(np.array(moon_altaz.alt.to_value(u.deg)))
+                        moon_separation_all.append(np.array(moon_separation.to_value(u.deg)))
+                        moon_phase_angle_all.append(np.array(moon_phase_angle.to_value(u.deg)))
 
                     ax11.plot(np.concatenate(time_all), np.concatenate(moon_altaz_all), label='Moon alt')
                     ax11.plot(np.concatenate(time_all), np.concatenate(moon_separation_all), label='Moon sep')
