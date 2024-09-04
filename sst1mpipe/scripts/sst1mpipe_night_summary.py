@@ -100,7 +100,7 @@ def get_sources(base_path):
     directories=[d for d in os.listdir(base_path) if os.path.isdir(base_path + '/'+ d)]
     print(directories)
     for d in directories:
-        if d not in ['log', 'output', 'error', 'UNKNOWN']:
+        if d not in ['log', 'output', 'error', 'UNKNOWN', 'dark', 'DARK', 'drak', 'DRAK']:
             sources.append(d)
     return sources
 
