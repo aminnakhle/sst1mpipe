@@ -142,13 +142,13 @@ def load_files(files, config=None, tel=None, level='dl1', stereo=False):
                 data = pd.concat([data, df])
             except:
                 print("Broken file", input_file)
-
+                continue
             if (level == 'dl1') and not stereo:
                 try:
                     ped_table = vstack([ped_table, pt])
                 except:
                     print("No pedestal monitoring in file", input_file)
-            
+                    continue
         i += 1
     return data, ped_table
 
@@ -412,11 +412,12 @@ def main():
                         print('BUNCH', i)
                         dl1, ped_table = load_files(dl1_files[i*bunch_size:bunch_size*(i+1)], tel=tel, level='dl1')
                         # Trigger rates
-                        if (len(dl1) > 0) and (len(ped_table) > 0):
+                        if len(dl1) > 0:
                             h1 = np.histogram(dl1.local_time, bins=dl1_rate_bins)
                             h_tot += h1[0]
                             # pedestal table
-                            plot_average_nsb_VS_time(ped_table,tt,ax=ax3, color=rate_colors[tel])
+                            if len(ped_table) > 0:
+                                plot_average_nsb_VS_time(ped_table,tt,ax=ax3, color=rate_colors[tel])
                             # CoGs - DL1 mono, survived cleaning
                             if tel == 'tel_021':
                                 h11, xedges, yedges = np.histogram2d(dl1['camera_frame_hillas_x'].dropna(), dl1['camera_frame_hillas_y'].dropna(), bins=100, range=[[-0.5, 0.5], [-0.5, 0.5]])
