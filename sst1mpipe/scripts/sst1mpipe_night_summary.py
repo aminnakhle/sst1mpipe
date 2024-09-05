@@ -98,10 +98,10 @@ def parse_args():
 def get_sources(base_path):
     sources = []
     directories=[d for d in os.listdir(base_path) if os.path.isdir(base_path + '/'+ d)]
-    print(directories)
     for d in directories:
-        if d not in ['log', 'output', 'error', 'UNKNOWN', 'dark', 'DARK', 'drak', 'DRAK']:
+        if d not in ['log', 'output', 'error', 'UNKNOWN', 'dark', 'DARK', 'drak', 'DRAK', 'TRANSITION', 'transition']:
             sources.append(d)
+    print(sources)
     return sources
 
 
@@ -349,7 +349,6 @@ def main():
                 else:
                     tel2_min = 1e15
                     tel2_max = 0
-    
         min_time_dl1 = min([tel1_min, tel2_min])
         max_time_dl1 = max([tel1_max, tel2_max])
         dl1_rate_bins = np.linspace(min_time_dl1, max_time_dl1, int((max_time_dl1-min_time_dl1)/10.))
