@@ -31,6 +31,7 @@ import sst1mpipe
 from sst1mpipe.io import (
     load_dl1_sst1m,
     load_dl2_sst1m,
+    load_dl1_pedestals,
     load_config,
     check_outdir
 )
@@ -101,14 +102,10 @@ def get_sources(base_path):
     for d in directories:
         if d not in ['log', 'output', 'error', 'UNKNOWN', 'dark', 'DARK', 'drak', 'DRAK', 'TRANSITION', 'transition']:
             sources.append(d)
-    print(sources)
+    logging.info('List of sources in the input directories:')
+    for source in sources:
+        logging.info(source)
     return sources
-
-
-def load_dl1_pedestals(input_file):
-    
-    pedestals = read_table(input_file, "/dl1/monitoring/telescope/pedestal")
-    return pedestals
 
 
 def load_files(files, config=None, tel=None, level='dl1', stereo=False):
@@ -128,7 +125,7 @@ def load_files(files, config=None, tel=None, level='dl1', stereo=False):
             elif level == 'dl2':
                 df = load_dl2_sst1m(input_file, tel=tel, config=config, table='pandas')
         except:
-            print("Broken file", input_file)
+            logging.warning("Broken file %s", input_file)
             continue
         if i == 0:
             data = df
@@ -141,13 +138,13 @@ def load_files(files, config=None, tel=None, level='dl1', stereo=False):
             try:
                 data = pd.concat([data, df])
             except:
-                print("Broken file", input_file)
+                logging.warning("Broken file %s", input_file)
                 continue
             if (level == 'dl1') and not stereo:
                 try:
                     ped_table = vstack([ped_table, pt])
                 except:
-                    print("No pedestal monitoring in file", input_file)
+                    logging.warning("No pedestal monitoring in file %s", input_file)
                     continue
         i += 1
     return data, ped_table
@@ -214,7 +211,7 @@ def get_distributions(dist_path=None, data_store=None):
 
         mask_datastore = data_store.obs_table['OBS_ID'] == int(obsid)
         if sum(mask_datastore) == 0:
-            print(int(obsid),'not in datastore!')
+            logging.warning('%d not in datastore!', int(obsid))
             continue
 
         histograms.append(np.array(hist['rate']).astype(np.float64))
@@ -239,8 +236,6 @@ def get_distributions(dist_path=None, data_store=None):
 
 def get_min_max_times(dl1_files, tel=None, config=None, stereo=False):
 
-    print(dl1_files[0])
-    print(dl1_files[-1])
     dl1_files = np.sort(dl1_files)
     ind = 0
     first_loaded = False
@@ -249,11 +244,11 @@ def get_min_max_times(dl1_files, tel=None, config=None, stereo=False):
             df = load_dl1_sst1m(dl1_files[ind], tel=tel, config=config, table='pandas', stereo=stereo)
             first_loaded = True
         except:
-            print('Broken file')
+            logging.warning('Broken file')
             ind += 1
             if ind > 50: 
                 first_loaded = True
-                print('Something is really wrong, too many broken files!')
+                logging.warning('Something is really wrong, too many broken files!')
     min_time = min(df['local_time'])
     ind = 0
     last_loaded = False
@@ -262,11 +257,11 @@ def get_min_max_times(dl1_files, tel=None, config=None, stereo=False):
             df = load_dl1_sst1m(dl1_files[len(dl1_files)-ind], tel=tel, config=config, table='pandas', stereo=stereo)
             last_loaded = True
         except:
-            print('Broken file')
+            logging.warning('Broken file')
             ind += 1
             if ind > 50: 
                 last_loaded = True
-                print('Something is really wrong, too many broken files!')
+                logging.warning('Something is really wrong, too many broken files!')
     max_time = max(df['local_time'])
     return min_time, max_time
 
@@ -306,6 +301,7 @@ def main():
 
     for source in sources:
 
+        logging.info(' ==== Preparing summary for source %s ==== ', source)
         fig, ax = plt.subplots(1, 1, figsize=(12, 5)) # trigger rates
         fig1, ax1 = plt.subplots(1, 1, figsize=(12, 5)) # trigger rates (zoom)
         fig2, ax2 = plt.subplots(1, 1, figsize=(12, 5)) # dl2 event rates
@@ -324,9 +320,10 @@ def main():
 
         rate_colors = {'tel_021':'blue', 'tel_022':'orange', 'stereo':'green'}
 
-        # making DL1 time bins
+        logging.info('Making DL1 time bins to speed up the processing.')
         bunch_size = 20 # N of files
         for telescope in ['cs1', 'cs2']:
+            logging.info('Telescope %s', telescope)
             base_path_source = base_path + '/' + date + '/' + source+'/' + telescope
             dl1_path = base_path_source + '/DL1/' + version
             is_dl1 = len(glob.glob(dl1_path+'/'+'*.h5'))
@@ -352,10 +349,12 @@ def main():
         min_time_dl1 = min([tel1_min, tel2_min])
         max_time_dl1 = max([tel1_max, tel2_max])
         dl1_rate_bins = np.linspace(min_time_dl1, max_time_dl1, int((max_time_dl1-min_time_dl1)/10.))
+        logging.info('Min_time %f, Max time %f', min_time_dl1, max_time_dl1)
 
         for telescope in tels:
 
             # Load all files
+            logging.info(' ==== Preparing summary for telescope %s ==== ', telescope)
             base_path_source = base_path + '/' + date + '/' + source+'/' + telescope
             dl1_path = base_path_source + '/DL1/' + version
             dl2_path = base_path_source + '/DL2/' + version
@@ -374,10 +373,19 @@ def main():
             if not is_dl2:
                 dl2_path = base_path_source + '/dl2/' + version
                 is_dl2 = len(glob.glob(dl2_path+'/'+'*.h5'))
-            if not dl3_path:
+            if not is_dl3:
                 dl3_path = base_path_source + '/dl3/' + version
                 is_dl3 = len(glob.glob(dl3_path+'/'+'*.fits'))
 
+            if not is_dl1:
+                logging.warning('DL1 data is missing, there are gonna be some missing figures in the final PDF.')
+            if not is_dl2:
+                logging.warning('DL2 data is missing, there are gonna be some missing figures in the final PDF.')
+            if not is_dl3:
+                logging.warning('DL3 data is missing, there are gonna be some missing figures in the final PDF.')
+            if not is_dist:
+                logging.warning('DL1 rate distributions are missing, there are gonna be some missing figures in the final PDF.')
+            
             if telescope not in 'stereo':
                 stereo=False
             else:
@@ -408,7 +416,7 @@ def main():
                 if tel != 'stereo':
                     h_tot = np.zeros(len(dl1_rate_bins)-1)
                     for i in range(N_bunches):
-                        print('BUNCH', i)
+                        logging.info('BUNCH %d', i)
                         dl1, ped_table = load_files(dl1_files[i*bunch_size:bunch_size*(i+1)], tel=tel, level='dl1')
                         # Trigger rates
                         if len(dl1) > 0:
@@ -495,7 +503,7 @@ def main():
                 moon_phase_angle_all = []
                 N_bunches = int(len(dl2_files)/bunch_size)
                 for i in range(N_bunches):
-                    print('BUNCH', i)
+                    logging.info('BUNCH %d', i)
                     dl2,_ = load_files(dl2_files[i*bunch_size:bunch_size*(i+1)], tel=tel, level='dl2')
                     if len(dl2) > 0:
                         h1 = np.histogram(dl2.local_time, bins=dl1_rate_bins)
@@ -725,6 +733,7 @@ def main():
             ax3.set_ylabel('NSB rate [MHz]')
             ax3.set_title("Night Sky Background", fontsize=16)
     
+        logging.info('All done, saving figures in temporary png files.')
         fig.savefig(outpath+'/trigger_rates.png', dpi=250)
         fig1.savefig(outpath+'/trigger_rates_zoom.png', dpi=250)
         fig2.savefig(outpath+'/reco_rates_zoom.png', dpi=250)
@@ -740,6 +749,7 @@ def main():
     
 
         # store pdf
+        logging.info('Combining png images in the final pdf file.')
         img1 = prepare_to_pdf(outpath+'/trigger_rates.png')
         img2 = prepare_to_pdf(outpath+'/trigger_rates_zoom.png')
         img3 = prepare_to_pdf(outpath+'/reco_rates_zoom.png')
@@ -758,6 +768,7 @@ def main():
         img1.save(outpath + '/' + pdf_file, "PDF", save_all=True, resolution=100.0, append_images=image_list)
 
         # remove all temporary png images
+        logging.info('Removing all temporary png images.')
         for f in glob.glob(outpath+'/*.png'):
             os.remove(f)
 
