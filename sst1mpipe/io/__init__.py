@@ -8,6 +8,7 @@ from .io import (
     write_extra_parameters,
     write_assumed_pointing,
     load_dl1_sst1m,
+    load_dl1_pedestals,
     load_dl2_sst1m,
     load_more_dl1_tables_mono,
     load_extra_table,

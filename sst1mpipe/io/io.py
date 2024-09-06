@@ -850,6 +850,26 @@ def load_photon_list_sst1m(input_file, tel=None, config=None, table='astropy', e
     return data
 
 
+def load_dl1_pedestals(input_file):
+    
+    """
+    Reads tables with pedestal info from the input HDF DL1 file.
+
+    Parameters
+    ----------
+    input_file: string
+        Path
+
+    Returns
+    -------
+    pedestals: astropy.table.Table
+
+    """
+
+    pedestals = read_table(input_file, "/dl1/monitoring/telescope/pedestal")
+    return pedestals
+
+
 def load_extra_table(input_file, key=None, remove_column=None):
 
     table = read_table(input_file, key)
