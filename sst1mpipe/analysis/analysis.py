@@ -433,3 +433,87 @@ def camera_to_altaz(
     horizon = camera_coord.transform_to(horizon_frame)
 
     return horizon
+
+
+def get_theta2_from_dl3(data_store, target_coords=None, theta2_axis=None, n_off=5, norm_range=[0.5, 0.7]*u.deg, theta_cut=0.1*u.deg):
+
+    theta2_off = np.zeros([len(theta2_axis.edges)-1, n_off])
+    off_radec = []
+    counts_all_on = []
+    counts_all_all_off=[]
+
+    event_counts = ThetaEventCounts()
+    event_counts.n_off_regions = n_off
+
+    sum_norm_on = 0
+    sum_norm_off = 0
+    N_on = 0
+    N_off = 0
+    t_elapsed = 0
+
+    observations = data_store.get_observations()
+
+    for observation in observations:
+        
+        mask = data_store.obs_table['OBS_ID'] == observation.obs_id
+        t_elapsed += data_store.obs_table[mask]['LIVETIME']
+
+        # ON counts
+        separation = target_coords.separation(observation.events.radec)
+        
+        N_on += sum(separation < theta_cut)
+        
+        counts_on, _ = np.histogram(separation ** 2, bins = theta2_axis.edges)
+        counts_all_on.append(counts_on)
+        
+        norm_on = (separation > norm_range[0]) & (separation < norm_range[1])
+        sum_norm_on += sum(norm_on)
+
+        # OFF counts
+        pos_angle = observation.pointing_radec.position_angle(target_coords)
+        sep_angle = observation.pointing_radec.separation(target_coords)
+
+        # Calculate the OFF counts from the wobble positions (OFF regions) provided
+        rotation_step = 360 / (n_off + 1)
+        rotations_off = np.arange(0, 359, rotation_step) * u.deg
+        rotations_off = rotations_off[rotations_off.to_value("deg") != 0]
+        rotations_off = pos_angle + rotations_off
+        
+        counts_all_off = []
+        for i_off, rotation in enumerate(rotations_off, start=0):
+            position_off = observation.pointing_radec.directional_offset_by(rotation, sep_angle)
+            separation_off = position_off.separation(observation.events.radec)
+            N_off += sum(separation_off < theta_cut)
+            counts_off_wob, _ = np.histogram(separation_off ** 2, bins = theta2_axis.edges)
+            norm_off = (separation_off > norm_range[0]) & (separation_off < norm_range[1])
+            sum_norm_off += sum(norm_off)
+            counts_all_off.append(counts_off_wob)
+
+        counts_all_all_off.append(np.sum(np.array(counts_all_off), axis=0))
+        
+    alpha = sum_norm_on/sum_norm_off
+
+    stat = WStatCountsStatistic(n_on=N_on, n_off=N_off, alpha=alpha)
+    event_counts.significance_lima = stat.sqrt_ts
+    event_counts.N_excess = N_on - alpha*N_off
+    event_counts.t_elapsed = t_elapsed.to(u.h)[0]
+
+    event_counts.N_on = N_on
+    event_counts.N_off = N_off
+
+    counts_on = np.sum(counts_all_on, axis=0)
+    counts_off = np.sum(np.array(counts_all_all_off), axis=0)
+
+    return counts_on, counts_off, alpha, event_counts
+
+
+class ThetaEventCounts:
+
+    def __init__(self):
+
+        self.N_on = 0.
+        self.N_off = 0.
+        self.N_excess = 0.
+        self.n_off_regions = 0.
+        self.t_elapsed = 0.
+        self.significance_lima = 0.

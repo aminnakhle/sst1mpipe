@@ -18,6 +18,7 @@ $> python sst1mpipe_night_summary.py
 --date 20240810
 --config sst1mpipe_config.json
 --sub-dir /v0.5.5/
+--source-catalog sst1m_source_catalog.json
 
 """
 
@@ -33,6 +34,7 @@ from sst1mpipe.io import (
     load_dl2_sst1m,
     load_dl1_pedestals,
     load_config,
+    load_source_catalog,
     check_outdir
 )
 import glob
@@ -42,7 +44,9 @@ import matplotlib.pyplot as plt
 
 from sst1mpipe.utils import (
     get_moon_params,
+    get_wr_timestamp,
 )
+
 import astropy.units as u
 from gammapy.data import DataStore
 from ctapipe.io import read_table
@@ -50,6 +54,10 @@ from astropy.time import Time
 from sst1mpipe.utils.NSB_tools import plot_average_nsb_VS_time
 from astropy.table import vstack
 from PIL import Image
+from gammapy.maps import MapAxis
+
+from sst1mpipe.analysis import get_theta2_from_dl3, plot_theta2_dl3
+from astropy.coordinates import SkyCoord
 
 
 def parse_args():
@@ -89,6 +97,12 @@ def parse_args():
                         '--sub-dir', '-s', type=str,
                         dest='version',
                         help='Sub directory for given data sample inside each data level directory, e.g. a version of sst1mpipe used (../DL{1,2,3}/v0.5.5/).',
+                        default=''
+                        )
+
+    parser.add_argument('--source-catalog', action='store', type=str,
+                        dest='source_cat',
+                        help='Path to a json file with catalog of all observed SST1M targets.',
                         default=''
                         )
 
@@ -275,6 +289,8 @@ def main():
     config_file = args.config_file
     version = args.version
     out_dir = args.out_dir
+    source_catalog_file = args.source_cat
+
     if len(out_dir) > 0:
         outpath = out_dir
     else:
@@ -297,6 +313,16 @@ def main():
 
     config = load_config(config_file)
 
+    is_catalog = False
+    if len(source_catalog_file):
+        try:
+            source_catalog = load_source_catalog(source_catalog_file)
+            is_catalog = True
+        except:
+            logging.warning('Source catalog file not found!')
+    else:
+        logging.warning('Source catalog file not specified!')
+
     tels = ['cs1', 'cs2', 'stereo']
 
     for source in sources:
@@ -314,9 +340,13 @@ def main():
         fig9, ax9 = plt.subplots(1, 2, figsize=(12, 5)) # cogs, dl2 mono, photons
         fig10, ax10 = plt.subplots(1, 2, figsize=(12, 5)) # DL1 stereo, survived cleaning
         fig11, ax11 = plt.subplots(1, 1, figsize=(6, 5)) # Moon
+        fig12, ax12 = plt.subplots(1, 2, figsize=(12, 5)) # stereo dt
+        fig13, ax13 = plt.subplots(1, 3, figsize=(16, 5)) # theta2 plots
 
         median1 = []
         median2 = []
+        t_diff_all = []
+        times_all = []
 
         rate_colors = {'tel_021':'blue', 'tel_022':'orange', 'stereo':'green'}
 
@@ -470,6 +500,14 @@ def main():
                             h22, xedges, yedges = np.histogram2d(dl1_stereo_2['camera_frame_hillas_x'].dropna(), dl1_stereo_2['camera_frame_hillas_y'].dropna(), bins=100, range=[[-0.5, 0.5], [-0.5, 0.5]])
                             h11_tot += h11
                             h22_tot += h22
+                            # WR timestamps
+                            t_t1 = get_wr_timestamp(dl1_stereo_1)
+                            t_t2 = get_wr_timestamp(dl1_stereo_2)
+                            dt = t_t1 - t_t2
+                            t_diff_all.append(dt)
+                            times_all.append(dl1_stereo_1.local_time.to_numpy())
+                            #print(t_diff_all)
+                            #print(len(times_all))
 
                     # last bunch
                     dl1_stereo_1,_ = load_files(dl1_files[bunch_size*(i+1):], tel='tel_021', level='dl1', stereo=stereo)
@@ -481,6 +519,13 @@ def main():
                         h22, xedges, yedges = np.histogram2d(dl1_stereo_2['camera_frame_hillas_x'].dropna(), dl1_stereo_2['camera_frame_hillas_y'].dropna(), bins=100, range=[[-0.5, 0.5], [-0.5, 0.5]])
                         h11_tot += h11
                         h22_tot += h22
+                        # WR timestamps
+                        t_t1 = get_wr_timestamp(dl1_stereo_1)
+                        t_t2 = get_wr_timestamp(dl1_stereo_2)
+                        dt = t_t1 - t_t2
+                        t_diff_all.append(dt)
+                        times_all.append(dl1_stereo_1.local_time.to_numpy())
+
                     centers = (dl1_rate_bins[1:]+dl1_rate_bins[:-1]) / 2
                     ax.plot(centers, h_tot/10, label=tel, alpha=0.7, color=rate_colors[tel])
                     ax1.plot(centers, h_tot/10, label=tel, alpha=0.7, color=rate_colors[tel])
@@ -488,6 +533,10 @@ def main():
                     X, Y = np.meshgrid(xedges, yedges)
                     ax10[0].pcolormesh(X, Y, h11_tot)
                     ax10[1].pcolormesh(X, Y, h22_tot)
+                    t_diff_all = np.concatenate(t_diff_all)
+                    times_all = np.concatenate(times_all)
+                    h = ax12[0].hist(t_diff_all, bins=100, range=[-1000, 1000])
+                    ax12[1].plot(times_all, t_diff_all, '.')
 
             if is_dl2:
                 # Reconstructed event rates (zoomed)
@@ -565,6 +614,7 @@ def main():
                     ax11.plot(np.concatenate(time_all), np.concatenate(moon_altaz_all), label='Moon alt')
                     ax11.plot(np.concatenate(time_all), np.concatenate(moon_separation_all), label='Moon sep')
                     ax11.plot(np.concatenate(time_all), np.concatenate(moon_phase_angle_all), label='Moon phase (full=0)')
+
                 # CoGs - DL2 mono, gammas
                 X, Y = np.meshgrid(xedges, yedges)
                 if len(dl2) > 0:
@@ -583,6 +633,73 @@ def main():
             # DL3 Datastore
             if is_dl3:
                 data_store = DataStore.from_dir(dl3_path)
+                try:
+                    target_coords = SkyCoord.from_name(source)
+                except:
+                    logging.info('%s coordinates cannot be guessed authomaticaly, using source catalog file %s.', source, source_catalog_file)
+                    if is_catalog:
+                        if len(source_catalog[source]):
+                            logging.info('Source coordinates found in the catalog file: %s', source_catalog[source])
+                            if source_catalog[source]['frame'] == 'icrs':
+                                target_coords = SkyCoord(
+                                    ra=source_catalog[source]['ra']*u.deg, 
+                                    dec=source_catalog[source]['dec']*u.deg, 
+                                    frame='icrs'
+                                    )
+                                logging.info('ra: %f, dec: %f', source_catalog[source]['ra'], source_catalog[source]['dec'])
+                            elif source_catalog[source]['frame'] == 'galactic':
+                                target_coords = SkyCoord(
+                                    l=source_catalog[source]['l']*u.deg, 
+                                    b=source_catalog[source]['b']*u.deg, 
+                                    frame='galactic'
+                                    )
+                                logging.info('l: %f, b: %f', source_catalog[source]['l'], source_catalog[source]['b'])
+
+                            theta2_axis = MapAxis.from_bounds(0, 0.5, nbin=10, interp="lin", unit="deg2")
+                            theta_cut = 0.2 * u.deg
+                            counts_on, counts_off, alpha, event_counts = get_theta2_from_dl3(
+                                data_store, 
+                                target_coords=target_coords, 
+                                theta2_axis=theta2_axis, 
+                                theta_cut=theta_cut
+                                )
+                            if tt == 21:
+                                ax13[0].set_title('tel1')
+                                plot_theta2_dl3(
+                                    ax=ax13[0], 
+                                    theta2_axis=theta2_axis, 
+                                    counts_on=counts_on, 
+                                    counts_off=counts_off, 
+                                    alpha=alpha, 
+                                    theta_cut=theta_cut, 
+                                    event_counts=event_counts
+                                    )
+                            elif tt == 22:
+                                ax13[1].set_title('tel2')
+                                plot_theta2_dl3(
+                                    ax=ax13[1], 
+                                    theta2_axis=theta2_axis, 
+                                    counts_on=counts_on, 
+                                    counts_off=counts_off, 
+                                    alpha=alpha, 
+                                    theta_cut=theta_cut, 
+                                    event_counts=event_counts
+                                    )                
+                            else:
+                                ax13[2].set_title('stereo')
+                                plot_theta2_dl3(
+                                    ax=ax13[2], 
+                                    theta2_axis=theta2_axis, 
+                                    counts_on=counts_on, 
+                                    counts_off=counts_off, 
+                                    alpha=alpha, 
+                                    theta_cut=theta_cut, 
+                                    event_counts=event_counts
+                                    )
+                        else:
+                            logging.warning('Source %s not found in the source catalog, unknown source coords, skipping theta2 figures.', source)
+                    else:
+                        logging.warning('Source catalog file %s not found, unknown source coords, skipping theta2 figures.', source_catalog_file)
             if is_dist:
                 histograms, histograms_diff, _, _, livetimes, survived_ped, bins = get_distributions(dist_path=dist_path, data_store=data_store)
 
@@ -675,6 +792,15 @@ def main():
                 fig10.suptitle("CoG of DL1 stereo events", fontsize=16)
                 ax10[0].set_title('tel1')
                 ax10[1].set_title('tel2')
+                # WR dt
+                fig12.suptitle("Time differences between stereo events", fontsize=16)
+                ax12[0].set_xlabel('DT [ns]')
+                ax12[0].set_xlim([-1200, 1200])
+                ax12[0].grid()
+                ax12[0].set_yscale('log')
+                ax12[1].set_ylim([-1200, 1200])
+                ax12[1].set_xlabel('local time [s]')
+                ax12[1].set_ylabel('DT [ns]')
 
             # Moon
             if is_dl2 and (tt == 21):
@@ -746,7 +872,8 @@ def main():
         fig9.savefig(outpath+'/cog_dl2_mono_photons.png', dpi=250)
         fig10.savefig(outpath+'/cog_dl1_stereo.png', dpi=250)
         fig11.savefig(outpath+'/moon.png', dpi=250)
-    
+        fig12.savefig(outpath+'/stereo_dt.png', dpi=250)
+        fig13.savefig(outpath+'/theta2.png', dpi=250)
 
         # store pdf
         logging.info('Combining png images in the final pdf file.')
@@ -762,7 +889,9 @@ def main():
         img10 = prepare_to_pdf(outpath+'/cog_dl2_mono_photons.png')
         img11 = prepare_to_pdf(outpath+'/cog_dl1_stereo.png')
         img12 = prepare_to_pdf(outpath+'/moon.png')
-        image_list = [img2, img3, img4, img5, img6, img7, img8, img9, img10, img11, img12]
+        img13 = prepare_to_pdf(outpath+'/stereo_dt.png')
+        img14 = prepare_to_pdf(outpath+'/theta2.png')
+        image_list = [img2, img3, img4, img5, img6, img7, img8, img9, img10, img11, img13, img12, img14]
 
         pdf_file = 'night_summary_' + str(date) + '_' +source+'.pdf'
         img1.save(outpath + '/' + pdf_file, "PDF", save_all=True, resolution=100.0, append_images=image_list)
