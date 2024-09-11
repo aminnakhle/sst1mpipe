@@ -134,6 +134,27 @@ def load_config(cfg_file, ismc=False):
     return config
 
 
+def load_source_catalog(catalog_file):
+    """
+    Reads sst1mpipe source catalog file which must
+    be stored as json file.
+
+    Parameters
+    ----------
+    catalog_file: string
+        Path to the catalog file
+
+    Returns
+    -------
+    catalog: dict
+
+    """
+
+    with open(catalog_file) as json_file:
+            catalog = Config(json.load(json_file))
+    return catalog
+
+
 def check_outdir(outdir):
     """
     Checks whether the outpath exists and creates

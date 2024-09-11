@@ -30,4 +30,5 @@ from .io import (
     write_dl1_info,
     get_dl1_info,
     load_more_dl2_files,
+    load_source_catalog,
 )

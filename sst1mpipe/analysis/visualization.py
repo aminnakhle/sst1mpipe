@@ -990,4 +990,36 @@ def plot_astri_sens(ax=None):
     )
     energy = sens[:, 0] * u.TeV
     diff_sens = sens[:, 1] * u.erg / (u.cm ** 2 * u.s)
-    ax.plot(energy.to(u.TeV), diff_sens.to(u.TeV / (u.cm ** 2 * u.s)), label='ASTRI Mini-Array (50h)')     
+    ax.plot(energy.to(u.TeV), diff_sens.to(u.TeV / (u.cm ** 2 * u.s)), label='ASTRI Mini-Array (50h)')
+
+
+def plot_theta2_dl3(ax=None, theta2_axis=None, counts_on=None, counts_off=None, alpha=None, theta_cut=None, event_counts=None):
+
+    ax.errorbar(theta2_axis.center, counts_on, yerr=np.sqrt(counts_on), fmt='o', ms=5)
+    ax.errorbar(theta2_axis.center, alpha*counts_off, yerr=alpha*np.sqrt(counts_off), fmt='o', ms=5)
+    ax.set_xlabel("$\\theta^{2} [deg^{2}]$")
+    ax.set_ylabel("Counts")
+    ax.grid(ls='dashed')
+    ax.axvline(theta_cut.to_value()**2, color='black',ls='--',alpha=0.75)
+    ax.set_xlim(theta2_axis.bounds[0].value, theta2_axis.bounds[1].value)
+
+    textstr = r'N$_{{\rm on}}$ = {:.0f} '\
+                f'\n'\
+                r'N$_{{\rm off}}$ = {:.0f} '\
+                f'\n'\
+                r'N$_{{\rm excess}}$ = {:.0f} '\
+                f'\n'\
+                r'n$_{{\rm off \, regions}}$ = {:.0f} '\
+                f'\n'\
+                r'Time = {:.1f}'\
+                f'\n'\
+                r'LiMa Significance = {:.1f} $\sigma$ '.format(event_counts.N_on,
+                                                        event_counts.N_off,
+                                                        event_counts.N_excess,
+                                                        event_counts.n_off_regions,
+                                                        event_counts.t_elapsed,
+                                                        event_counts.significance_lima)
+
+    props = dict(boxstyle='round', facecolor='wheat', alpha=0.95)
+    txt = ax.text(0.50, 0.96, textstr, transform=ax.transAxes, fontsize=10,
+                verticalalignment='top', bbox=props)

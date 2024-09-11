@@ -13,7 +13,8 @@ from .visualization import (
     plot_source_sed,
     plot_hawc_sens,
     plot_lhaaso_sens,
-    plot_astri_sens
+    plot_astri_sens,
+    plot_theta2_dl3
 )
 from .analysis import (
     add_wobble_flag,
@@ -24,5 +25,6 @@ from .analysis import (
     add_reco_ra_dec,
     get_horizon_frame,
     get_camera_frame,
-    get_theta_off_stereo
+    get_theta_off_stereo,
+    get_theta2_from_dl3
 )
