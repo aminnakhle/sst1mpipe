@@ -31,4 +31,5 @@ from .io import (
     get_dl1_info,
     load_more_dl2_files,
     load_source_catalog,
+    load_distributions_sst1m
 )

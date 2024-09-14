@@ -53,7 +53,8 @@ from .utils import (
     get_GTIs,
     get_pointing_radec,
     swap_modules_59_88,
-    get_swap_flag
+    get_swap_flag,
+    get_sources_in_dir
 )
 
 from .cleaning import (

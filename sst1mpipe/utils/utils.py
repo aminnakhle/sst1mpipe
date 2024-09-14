@@ -1704,3 +1704,30 @@ def get_dt_from_altaz(altaz_coord):
                            location=subarray.reference_location)
     DT = (d_tels/c.c * np.cos(tel_axis_altaz.separation( altaz_coord ))).to_value("ns")
     return DT
+
+
+def get_sources_in_dir(base_path):
+    """
+    Creates a list of processed sources in given base directory.
+
+    Parameters
+    ----------
+    base_path: string
+        Directory with all data for given night. It
+        should contain folders with names of observed
+        sources. 
+
+    Returns
+    -------
+    sources: list of strings
+
+    """
+    sources = []
+    directories=[d for d in os.listdir(base_path) if os.path.isdir(base_path + '/'+ d)]
+    for d in directories:
+        if d not in ['log', 'output', 'error', 'UNKNOWN', 'dark', 'DARK', 'drak', 'DRAK', 'TRANSITION', 'transition']:
+            sources.append(d)
+    logging.info('List of sources in the input directories:')
+    for source in sources:
+        logging.info(source)
+    return sources

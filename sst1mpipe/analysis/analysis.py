@@ -20,6 +20,8 @@ from sst1mpipe.utils import (
 
 from sst1mpipe.performance import get_theta
 import logging
+from gammapy.data import DataStore
+
 
 def add_reco_ra_dec(data, horizon_frame=None):
     """
@@ -435,8 +437,9 @@ def camera_to_altaz(
     return horizon
 
 
-def get_theta2_from_dl3(data_store, target_coords=None, theta2_axis=None, n_off=5, norm_range=[0.5, 0.7]*u.deg, theta_cut=0.1*u.deg):
+def get_theta2_from_dl3(dl3_path, target_coords=None, theta2_axis=None, n_off=5, norm_range=[0.5, 0.7]*u.deg, theta_cut=0.1*u.deg):
 
+    data_store = DataStore.from_dir(dl3_path)
     theta2_off = np.zeros([len(theta2_axis.edges)-1, n_off])
     off_radec = []
     counts_all_on = []
