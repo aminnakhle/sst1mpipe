@@ -48,6 +48,7 @@ import operator
 from astropy.coordinates import SkyCoord, AltAz
 from astropy.time import Time
 import glob
+from gammapy.data import DataStore
 
 
 def read_charges_data(file):
@@ -1322,3 +1323,89 @@ def isfloat(num):
         return True
     except:
         return False
+
+
+def load_distributions_sst1m(dist_path=None, dl3_path=None):
+    """
+    Reads all HDF files with DL1 distributions created with 
+    sst1mpipe_extract_dl1_distributions per wobble and stack 
+    them in output arrays.
+
+    Parameters
+    ----------
+    dist_path: string
+        Path to the HDF distribution files (one file per DL3)
+    dl3_path: string
+        Path to corresponding DL3 files.
+
+    Returns
+    -------
+    histograms: numpy.ndarray
+        Event rates bined in intensity
+    histograms_diff: numpy.ndarray
+        Differential event rates bined in intensity
+    zeniths: numpy.ndarray
+        Mean zenith angles per DL3 file
+    obsids_sorted: numpy.ndarray
+        OBS_ID of each DL3 file
+    livetimes: numpy.ndarray
+        Livetime of each DL3 file
+    survived_ped: numpy.ndarray
+        Fraction of survived pedestale events in each DL3 file
+    bins: numpy.ndarray
+        Bin edges of rate-intensity histograms
+    """
+
+    histograms = []
+    histograms_diff = []
+    zeniths = []
+    obsids_sorted = []
+    livetimes = []
+    survived_ped = []
+
+    no_ped = 0
+    tables =  glob.glob(dist_path+'/intensity*.h5')
+    if len(tables) == 0:
+        # this is to read the data from date when we do not have pedestal events, so no recleaning, but we still index them in dl3 index files
+        tables =  glob.glob(dist_path+'/intensity*.h5')
+        no_ped = 1
+
+    for table in tables:
+        obsid = table.split('/')[-1].split('.')[0].split('_')[-1]
+        hist = read_table(table, 'intensity_hist')
+        t_elapsed = read_table(table, 't_elapsed')
+        try:
+            zenith = read_table(table, 'zenith')
+        except:
+            zenith = read_table(table, 'z_elapsed')
+
+        # so that the pedestal fraction cut does not remove data for which we do not have pedestals (in those distribution files there is pedestal_frac=100.)
+        if no_ped:
+            survived_pedestal_frac = [0.]
+        else:
+            survived_pedestal_frac = read_table(table, 'survived_pedestal_frac')
+
+        data_store = DataStore.from_dir(dl3_path)
+        mask_datastore = data_store.obs_table['OBS_ID'] == int(obsid)
+        if sum(mask_datastore) == 0:
+            logging.warning('%d not in datastore!', int(obsid))
+            continue
+
+        histograms.append(np.array(hist['rate']).astype(np.float64))
+        histograms_diff.append(np.array(hist['diff_rate']).astype(np.float64))
+        zeniths.append(np.array(zenith)[0].astype(np.float64))
+        obsids_sorted.append(int(obsid))
+        survived_ped.append(np.array(survived_pedestal_frac)[0].astype(np.float64))
+        bins = np.hstack((np.array(hist['low']),hist['high'][-1]))    
+        mask_datastore = data_store.obs_table['OBS_ID'] == int(obsid)
+        livetime = data_store.obs_table['LIVETIME'].value
+        livetimes.append(livetime[mask_datastore][0])
+    
+    histograms = np.array(histograms)
+    histograms_diff = np.array(histograms_diff)
+    zeniths = np.array(zeniths)
+    survived_ped = np.array(survived_ped)
+    obsids_sorted = np.array(obsids_sorted)
+    livetimes = np.array(livetimes).flatten()
+
+    return histograms, histograms_diff, zeniths, obsids_sorted, livetimes, survived_ped, bins

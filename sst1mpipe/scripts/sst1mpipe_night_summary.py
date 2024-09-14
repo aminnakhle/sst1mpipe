@@ -45,10 +45,12 @@ import matplotlib.pyplot as plt
 from sst1mpipe.utils import (
     get_moon_params,
     get_wr_timestamp,
+    get_sources_in_dir
 )
 
+from sst1mpipe.io import load_distributions_sst1m
+
 import astropy.units as u
-from gammapy.data import DataStore
 from ctapipe.io import read_table
 from astropy.time import Time
 from sst1mpipe.utils.NSB_tools import plot_average_nsb_VS_time
@@ -108,18 +110,6 @@ def parse_args():
 
     args = parser.parse_args()
     return args
-
-
-def get_sources(base_path):
-    sources = []
-    directories=[d for d in os.listdir(base_path) if os.path.isdir(base_path + '/'+ d)]
-    for d in directories:
-        if d not in ['log', 'output', 'error', 'UNKNOWN', 'dark', 'DARK', 'drak', 'DRAK', 'TRANSITION', 'transition']:
-            sources.append(d)
-    logging.info('List of sources in the input directories:')
-    for source in sources:
-        logging.info(source)
-    return sources
 
 
 def load_files(files, config=None, tel=None, level='dl1', stereo=False):
@@ -192,62 +182,6 @@ def prepare_to_pdf(image_path):
     return background1
 
 
-def get_distributions(dist_path=None, data_store=None):
-
-    histograms = []
-    histograms_diff = []
-    zeniths = []
-    obsids_sorted = []
-    livetimes = []
-    survived_ped = []
-
-    no_ped = 0
-    tables =  glob.glob(dist_path+'/intensity*.h5')
-    if len(tables) == 0:
-        # this is to read the data from date when we do not have pedestal events, so no recleaning, but we still index them in dl3 index files
-        tables =  glob.glob(dist_path+'/intensity*.h5')
-        no_ped = 1
-
-    for table in tables:
-        obsid = table.split('/')[-1].split('.')[0].split('_')[-1]
-        hist = read_table(table, 'intensity_hist')
-        t_elapsed = read_table(table, 't_elapsed')
-        try:
-            zenith = read_table(table, 'zenith')
-        except:
-            zenith = read_table(table, 'z_elapsed')
-
-        # so that the pedestal fraction cut does not remove data for which we do not have pedestals (in those distribution files there is pedestal_frac=100.)
-        if no_ped:
-            survived_pedestal_frac = [0.]
-        else:
-            survived_pedestal_frac = read_table(table, 'survived_pedestal_frac')
-
-        mask_datastore = data_store.obs_table['OBS_ID'] == int(obsid)
-        if sum(mask_datastore) == 0:
-            logging.warning('%d not in datastore!', int(obsid))
-            continue
-
-        histograms.append(np.array(hist['rate']).astype(np.float64))
-        histograms_diff.append(np.array(hist['diff_rate']).astype(np.float64))
-        zeniths.append(np.array(zenith)[0].astype(np.float64))
-        obsids_sorted.append(int(obsid))
-        survived_ped.append(np.array(survived_pedestal_frac)[0].astype(np.float64))
-        bins = np.hstack((np.array(hist['low']),hist['high'][-1]))    
-        mask_datastore = data_store.obs_table['OBS_ID'] == int(obsid)
-        livetime = data_store.obs_table['LIVETIME'].value
-        livetimes.append(livetime[mask_datastore][0])
-    
-    histograms = np.array(histograms)
-    histograms_diff = np.array(histograms_diff)
-    zeniths = np.array(zeniths)
-    survived_ped = np.array(survived_ped)
-    obsids_sorted = np.array(obsids_sorted)
-    livetimes = np.array(livetimes).flatten()
-
-    return histograms, histograms_diff, zeniths, obsids_sorted, livetimes, survived_ped, bins
-
-
 def get_min_max_times(dl1_files, tel=None, config=None, stereo=False):
 
     dl1_files = np.sort(dl1_files)
@@ -309,7 +243,7 @@ def main():
         )
     logging.info('sst1mpipe version: %s', sst1mpipe.__version__)
 
-    sources = get_sources(base_path + '/' + date + '/')
+    sources = get_sources_in_dir(base_path + '/' + date + '/')
 
     config = load_config(config_file)
 
@@ -632,7 +566,6 @@ def main():
 
             # DL3 Datastore
             if is_dl3:
-                data_store = DataStore.from_dir(dl3_path)
                 try:
                     target_coords = SkyCoord.from_name(source)
                 except:
@@ -658,7 +591,7 @@ def main():
                             theta2_axis = MapAxis.from_bounds(0, 0.5, nbin=10, interp="lin", unit="deg2")
                             theta_cut = 0.2 * u.deg
                             counts_on, counts_off, alpha, event_counts = get_theta2_from_dl3(
-                                data_store, 
+                                dl3_path, 
                                 target_coords=target_coords, 
                                 theta2_axis=theta2_axis, 
                                 theta_cut=theta_cut
@@ -701,7 +634,7 @@ def main():
                     else:
                         logging.warning('Source catalog file %s not found, unknown source coords, skipping theta2 figures.', source_catalog_file)
             if is_dist:
-                histograms, histograms_diff, _, _, livetimes, survived_ped, bins = get_distributions(dist_path=dist_path, data_store=data_store)
+                histograms, histograms_diff, _, _, livetimes, survived_ped, bins = load_distributions_sst1m(dist_path=dist_path, dl3_path=dl3_path)
 
             # PLOTTING
 
