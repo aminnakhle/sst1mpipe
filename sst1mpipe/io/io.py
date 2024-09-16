@@ -18,6 +18,7 @@ from datetime import datetime
 from sst1mpipe.utils import (
     add_pointing_mc,
     add_features,
+    add_timing_features,
     add_log_true_energy,
     add_disp,
     event_selection,
@@ -321,6 +322,9 @@ def write_extra_parameters(
 
         params = read_table(file, "/dl1/event/telescope/parameters/" + tel)
         params = add_features(params)
+
+        #images = read_table(file, "/dl1/event/telescope/images/" + tel)
+        #params = add_timing_features(params, images)
 
         if ismc:
             params = add_pointing_mc(params, input_file=file, tel=tel)

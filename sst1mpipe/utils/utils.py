@@ -988,6 +988,36 @@ def add_features(data):
     return data
 
 
+def add_timing_features(data, images):
+    """
+    Add some extra parameters in the DL1 table. 
+
+    Parameters
+    ----------
+    data: astropy.table.Table
+
+    Returns
+    -------
+    astropy.table.Table 
+
+    """
+    cleaning_mask = images['image_mask']
+    params = np.empty((len(cleaning_mask), 4))
+    t_rms = np.sqrt(np.mean((images['image_mask'][cleaning_mask]-np.mean(images['peak_time'][cleaning_mask]))**2))
+
+    """
+    params[cleaning_mask, 0] = 
+    if sum(cleaning_mask): 
+        t_rms = np.sqrt(np.mean((event.dl1.tel[1].peak_time[cleaning_mask]-np.mean(event.dl1.tel[1].peak_time[cleaning_mask]))**2))
+        t_rms_w = np.sqrt(np.mean(event.dl1.tel[1].image[cleaning_mask]*(event.dl1.tel[1].peak_time[cleaning_mask]-np.mean(event.dl1.tel[1].peak_time[cleaning_mask]))**2))
+        t_lac = np.max(event.dl1.tel[1].peak_time[cleaning_mask]) - np.min(event.dl1.tel[1].peak_time[cleaning_mask])
+        len_st = np.corrcoef(event.dl1.tel[1].peak_time[cleaning_mask], event.dl1.tel[1].image[cleaning_mask])[0, 1]
+        table2.append([np.sum(event.dl1.tel[1].image[cleaning_mask]), event.simulation.shower.energy.to_value(u.TeV), t_rms, t_rms_w, t_lac, len_st])
+    """
+
+    return data
+
+
 def add_log_true_energy(data):
     """
     Add log of the true energy in 
