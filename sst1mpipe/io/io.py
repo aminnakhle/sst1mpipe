@@ -323,8 +323,8 @@ def write_extra_parameters(
         params = read_table(file, "/dl1/event/telescope/parameters/" + tel)
         params = add_features(params)
 
-        #images = read_table(file, "/dl1/event/telescope/images/" + tel)
-        #params = add_timing_features(params, images)
+        images = read_table(file, "/dl1/event/telescope/images/" + tel)
+        params = add_timing_features(params, images)
 
         if ismc:
             params = add_pointing_mc(params, input_file=file, tel=tel)

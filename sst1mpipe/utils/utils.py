@@ -1002,18 +1002,17 @@ def add_timing_features(data, images):
 
     """
     cleaning_mask = images['image_mask']
-    params = np.empty((len(cleaning_mask), 4))
-    t_rms = np.sqrt(np.mean((images['image_mask'][cleaning_mask]-np.mean(images['peak_time'][cleaning_mask]))**2))
+    data['t_rms'] = np.empty(len(cleaning_mask))
+    data['t_rms_w'] = np.empty(len(cleaning_mask))
+    data['t_lac'] = np.empty(len(cleaning_mask))
+    data['len_st'] = np.empty(len(cleaning_mask))
 
-    """
-    params[cleaning_mask, 0] = 
-    if sum(cleaning_mask): 
-        t_rms = np.sqrt(np.mean((event.dl1.tel[1].peak_time[cleaning_mask]-np.mean(event.dl1.tel[1].peak_time[cleaning_mask]))**2))
-        t_rms_w = np.sqrt(np.mean(event.dl1.tel[1].image[cleaning_mask]*(event.dl1.tel[1].peak_time[cleaning_mask]-np.mean(event.dl1.tel[1].peak_time[cleaning_mask]))**2))
-        t_lac = np.max(event.dl1.tel[1].peak_time[cleaning_mask]) - np.min(event.dl1.tel[1].peak_time[cleaning_mask])
-        len_st = np.corrcoef(event.dl1.tel[1].peak_time[cleaning_mask], event.dl1.tel[1].image[cleaning_mask])[0, 1]
-        table2.append([np.sum(event.dl1.tel[1].image[cleaning_mask]), event.simulation.shower.energy.to_value(u.TeV), t_rms, t_rms_w, t_lac, len_st])
-    """
+    for i in range(len(cleaning_mask)):
+        if sum(cleaning_mask[i]):
+            data['t_rms'][i] = np.sqrt(np.mean((images['peak_time'][i][cleaning_mask[i]]-np.mean(images['peak_time'][i][cleaning_mask[i]]))**2))
+            data['t_rms_w'][i] = np.sqrt(np.mean(images['image'][i][cleaning_mask[i]]*(images['peak_time'][i][cleaning_mask[i]]-np.mean(images['peak_time'][i][cleaning_mask[i]]))**2))
+            data['t_lac'][i] = np.max(images['peak_time'][i][cleaning_mask[i]]) - np.min(images['peak_time'][i][cleaning_mask[i]])
+            data['len_st'][i] = np.corrcoef(images['peak_time'][i][cleaning_mask[i]], images['image'][i][cleaning_mask[i]])[0, 1]
 
     return data
 
