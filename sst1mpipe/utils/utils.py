@@ -1010,7 +1010,7 @@ def add_timing_features(data, images):
     for i in range(len(cleaning_mask)):
         if sum(cleaning_mask[i]):
             data['t_rms'][i] = np.sqrt(np.mean((images['peak_time'][i][cleaning_mask[i]]-np.mean(images['peak_time'][i][cleaning_mask[i]]))**2))
-            data['t_rms_w'][i] = np.sqrt(np.mean(images['image'][i][cleaning_mask[i]]*(images['peak_time'][i][cleaning_mask[i]]-np.mean(images['peak_time'][i][cleaning_mask[i]]))**2))
+            data['t_rms_w'][i] = np.sqrt(np.sum(images['image'][i][cleaning_mask[i]]*(images['peak_time'][i][cleaning_mask[i]]-np.mean(images['peak_time'][i][cleaning_mask[i]]))**2)/np.sum(images['image'][i][cleaning_mask[i]]))
             data['t_lac'][i] = np.max(images['peak_time'][i][cleaning_mask[i]]) - np.min(images['peak_time'][i][cleaning_mask[i]])
             data['len_st'][i] = np.corrcoef(images['peak_time'][i][cleaning_mask[i]], images['image'][i][cleaning_mask[i]])[0, 1]
 
