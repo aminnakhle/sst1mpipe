@@ -995,6 +995,11 @@ def add_timing_features(data, images):
     Parameters
     ----------
     data: astropy.table.Table
+        table with event parameters, 
+        usualy stored in /dl1/event/telescope/parameters/{tel}
+    images: astropy.table.Table
+        table with event image, pixel timing and cleaning mask, 
+        usualy stored in /dl1/event/telescope/images/{tel}
 
     Returns
     -------
