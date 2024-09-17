@@ -607,13 +607,15 @@ def stereo_reconstruction(
     weights = config["analysis"]["stereo_reco_weights"]
     logging.info('Stereo reconstruction event weights: %s', weights)
 
-    energy_average = get_average_param(params, param='log_reco_energy', weights=weights)
-    gammaness_average = get_average_param(params, param='gammaness', weights=weights)
+    energy_average, energy_var = get_average_param(params, param='log_reco_energy', weights=weights)
+    gammaness_average, gammaness_var = get_average_param(params, param='gammaness', weights=weights)
 
     dl2 = get_stereo_dl2(params, ismc=ismc)
     dl2['log_reco_energy'] = energy_average
     dl2['reco_energy'] = 10**energy_average
+    dl2['var_reco_energy'] = 10**energy_var
     dl2['gammaness'] = gammaness_average
+    dl2['var_gammaness'] = gammaness_var
 
     # Arrival direction reconstruction
 
@@ -838,8 +840,11 @@ def get_average_param(params, param=None, weights=None):
 
     Returns
     -------
-    pandas.DataFrame
-
+    average:    
+        pandas.DataFrame
+    variance:
+        Note that variance is calculated always from unweighted quantities
+        pandas.DataFrame
     """
 
     logging.info('Averaging reconstructed %s', param)
@@ -852,26 +857,29 @@ def get_average_param(params, param=None, weights=None):
                 "obs_id": params["obs_id"],
                 "event_id": params["event_id"],
                 "weight": weights,
+                "param": params[param],
                 "weighted_param": params[param] * weights,
             }
         )
 
         df_sum = df.groupby(["obs_id", "event_id"]).sum()
         average = df_sum["weighted_param"] / df_sum["weight"]
+        variance = df.groupby(["obs_id", "event_id"]).var()["param"]
 
     else:
         df = pd.DataFrame(
             data={
                 "obs_id": params["obs_id"],
                 "event_id": params["event_id"],
-                "weighted_param": params[param],
+                "param": params[param],
             }
         )
 
         df_sum = df.groupby(["obs_id", "event_id"]).sum()
-        average = df_sum["weighted_param"] / df.groupby(["obs_id", "event_id"]).size()
+        average = df_sum["param"] / df.groupby(["obs_id", "event_id"]).size()
+        variance = df.groupby(["obs_id", "event_id"]).var()["param"]
 
-    return average
+    return average, variance
 
 
 def get_stereo_dl2(params, ismc=False):
