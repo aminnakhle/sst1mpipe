@@ -175,8 +175,8 @@ def main():
 
     if ismc:
         processing_info.output_file = os.path.join(outdir,  processing_info.input_file.split('/')[-1].rstrip(".corsika.gz.simtel.gz") + "_dl1.h5")
-        output_logfile = os.path.join(outdir, input_file.split('/')[-1].rstrip(".corsika.gz.simtel.gz") + "_r1_dl1.log")
-        processing_info.output_file_px_charges = os.path.join(outdir, input_file.split('/')[-1].rstrip(".corsika.gz.simtel.gz") + "_pedestal_hist.h5")
+        output_logfile = os.path.join(outdir, processing_info.input_file.split('/')[-1].rstrip(".corsika.gz.simtel.gz") + "_r1_dl1.log")
+        processing_info.output_file_px_charges = os.path.join(outdir, processing_info.input_file.split('/')[-1].rstrip(".corsika.gz.simtel.gz") + "_pedestal_hist.h5")
     else:
         processing_info.output_file = os.path.join(outdir,  processing_info.input_file.split('/')[-1].rstrip(".fits.fz") + "_dl1.h5")
         output_logfile = os.path.join(outdir,  processing_info.input_file.split('/')[-1].rstrip(".fits.fz") + "_r1_dl1.log")
@@ -453,8 +453,9 @@ def main():
                 processing_info.count_pedestals(event)
 
             # skip rest of the script for pedestal events
-            if event_type == 8:
-                continue
+            if not ismc:
+                if event_type == 8:
+                    continue
 
             # Calculation of fraction of true charge which survived cleaning
             processing_info.count_survived_charge(event, ismc=source.is_simulation)
@@ -525,7 +526,7 @@ def main():
         # NOTE: This doesn't change the mc and histogram tab in the output files and this must be taken care of in performance
         # evaluation. We cannot recalculate N of simulated events at this point for each individual dl1 file, because it would 
         # lead to an error of the order of 10%.
-        energy_min_cut(output_file, config=config)
+        energy_min_cut(processing_info.output_file, config=config)
 
     # write all processing monitoring information
     write_dl1_info(processing_info)

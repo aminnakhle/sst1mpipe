@@ -988,6 +988,40 @@ def add_features(data):
     return data
 
 
+def add_timing_features(data, images):
+    """
+    Add some extra parameters in the DL1 table. 
+
+    Parameters
+    ----------
+    data: astropy.table.Table
+        table with event parameters, 
+        usualy stored in /dl1/event/telescope/parameters/{tel}
+    images: astropy.table.Table
+        table with event image, pixel timing and cleaning mask, 
+        usualy stored in /dl1/event/telescope/images/{tel}
+
+    Returns
+    -------
+    astropy.table.Table 
+
+    """
+    cleaning_mask = images['image_mask']
+    data['t_rms'] = np.empty(len(cleaning_mask))
+    data['t_rms_w'] = np.empty(len(cleaning_mask))
+    data['t_lac'] = np.empty(len(cleaning_mask))
+    data['len_st'] = np.empty(len(cleaning_mask))
+
+    for i in range(len(cleaning_mask)):
+        if sum(cleaning_mask[i]):
+            data['t_rms'][i] = np.sqrt(np.mean((images['peak_time'][i][cleaning_mask[i]]-np.mean(images['peak_time'][i][cleaning_mask[i]]))**2))
+            data['t_rms_w'][i] = np.sqrt(np.sum(images['image'][i][cleaning_mask[i]]*(images['peak_time'][i][cleaning_mask[i]]-np.mean(images['peak_time'][i][cleaning_mask[i]]))**2)/np.sum(images['image'][i][cleaning_mask[i]]))
+            data['t_lac'][i] = np.max(images['peak_time'][i][cleaning_mask[i]]) - np.min(images['peak_time'][i][cleaning_mask[i]])
+            data['len_st'][i] = np.corrcoef(images['peak_time'][i][cleaning_mask[i]], images['image'][i][cleaning_mask[i]])[0, 1]
+
+    return data
+
+
 def add_log_true_energy(data):
     """
     Add log of the true energy in 

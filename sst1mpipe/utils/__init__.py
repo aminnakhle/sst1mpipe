@@ -6,6 +6,7 @@ from .utils import (
     mix_gamma_proton,
     correct_true_image,
     add_features,
+    add_timing_features,
     add_log_true_energy,
     add_pointing_mc,
     add_disp,
