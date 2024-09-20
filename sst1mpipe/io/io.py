@@ -7,6 +7,7 @@ from astropy.table import join
 import tables
 import json
 import os
+from os import path
 from traitlets.config import Config
 import logging
 from astropy.io.misc.hdf5 import (
@@ -50,6 +51,7 @@ from astropy.coordinates import SkyCoord, AltAz
 from astropy.time import Time
 import glob
 from gammapy.data import DataStore
+import pkg_resources
 
 
 def read_charges_data(file):
@@ -130,9 +132,17 @@ def load_config(cfg_file, ismc=False):
     config: dict
 
     """
+    if cfg_file is None:
+        logging.info('No config file specified, loading default config.')
+        if ismc:
+            default_config = 'sst1mpipe_mc_config.json'
+        else:
+            default_config = 'sst1mpipe_data_config.json'
+        cfg_file = pkg_resources.resource_filename('sst1mpipe',path.join('data',default_config))
 
     with open(cfg_file) as json_file:
             config = Config(json.load(json_file))
+
     return config
 
 

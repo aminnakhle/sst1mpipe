@@ -815,7 +815,7 @@ def angular_distance(params, combination='pp', tels=None):
     Returns
     -------
     pandas.DataFrame
-
+        distance in radians
     """
 
     distance = angular_separation_altaz(
