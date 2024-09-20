@@ -1,13 +1,23 @@
 #!/usr/bin/env python
 
 """
-
+Script to calculate observability of any source from the catalog
+for a single particular night. If no date is specified, the following
+night is the default. Any source in the catalog can be removed from 
+plotting/calculation if obsplan_show: false. The script plots source
+visibility and moon distance and stores the figure in the output dir.
+It also prints observability windows with moon distance and altitude
+taken into account. All times are in local time (CEST/CET).
 
 Usage:
 
 $> python sst1mpipe_obsplan.py
 --date 20240810
 --source-catalog sst1m_source_catalog.json
+--output-dir ./
+--config sst1mpipe_config.json
+--min-moon-dist 50.
+--max-zenith 50.
 
 """
 
