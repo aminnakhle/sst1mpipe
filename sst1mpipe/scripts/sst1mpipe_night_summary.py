@@ -108,6 +108,13 @@ def parse_args():
                         default=''
                         )
 
+    parser.add_argument(
+                        '--read-dl1-from-dl2',
+                        action='store_true',
+                        help='If used, the script will ignore the DL1 directories and tries to read DL1 tabs from DL2 files.',
+                        dest='read_dl1_tab_from_dl2_files'
+                        )
+
     args = parser.parse_args()
     return args
 
@@ -224,6 +231,14 @@ def main():
     version = args.version
     out_dir = args.out_dir
     source_catalog_file = args.source_cat
+    read_dl1_tab_from_dl2_files = args.read_dl1_tab_from_dl2_files
+
+    if read_dl1_tab_from_dl2_files:
+        dl1_tab_data_level = 'dl2'
+        logging.warning('DL1 tables read from DL2 files.')
+    else:
+        dl1_tab_data_level = 'dl1'
+
 
     if len(out_dir) > 0:
         outpath = out_dir
@@ -286,26 +301,27 @@ def main():
 
         logging.info('Making DL1 time bins to speed up the processing.')
         bunch_size = 20 # N of files
+
         for telescope in ['cs1', 'cs2']:
             logging.info('Telescope %s', telescope)
             base_path_source = base_path + '/' + date + '/' + source+'/' + telescope
-            dl1_path = base_path_source + '/DL1/' + version
+            dl1_path = base_path_source + '/' + dl1_tab_data_level.upper() + '/' + version
             is_dl1 = len(glob.glob(dl1_path+'/'+'*.h5'))
             # handle lower case directories
             if not is_dl1:
-                dl1_path = base_path_source + '/dl1/' + version
+                dl1_path = base_path_source + '/' + dl1_tab_data_level.lower() + '/' + version
                 is_dl1 = len(glob.glob(dl1_path+'/'+'*.h5'))
-
+                
             if telescope == 'cs1':
                 if is_dl1:
-                    dl1_files = make_file_list(dl1_path, stereo=False, level='dl1')
+                    dl1_files = make_file_list(dl1_path, stereo=False, level=dl1_tab_data_level)
                     tel1_min, tel1_max = get_min_max_times(dl1_files, tel='tel_021', config=config)
                 else:
                     tel1_min = 1e15
                     tel1_max = 0
             elif telescope == 'cs2':
                 if is_dl1:
-                    dl1_files = make_file_list(dl1_path, stereo=False, level='dl1')
+                    dl1_files = make_file_list(dl1_path, stereo=False, level=dl1_tab_data_level)
                     tel2_min, tel2_max = get_min_max_times(dl1_files, tel='tel_022', config=config)
                 else:
                     tel2_min = 1e15
@@ -320,7 +336,7 @@ def main():
             # Load all files
             logging.info(' ==== Preparing summary for telescope %s ==== ', telescope)
             base_path_source = base_path + '/' + date + '/' + source+'/' + telescope
-            dl1_path = base_path_source + '/DL1/' + version
+            dl1_path = base_path_source + '/'+dl1_tab_data_level.upper()+'/' + version
             dl2_path = base_path_source + '/DL2/' + version
             dl3_path = base_path_source + '/DL3/' + version
             dist_path = base_path_source + '/distributions/' + version
@@ -332,7 +348,7 @@ def main():
 
             # handle low case directories
             if not is_dl1:
-                dl1_path = base_path_source + '/dl1/' + version
+                dl1_path = base_path_source + '/'+dl1_tab_data_level.lower()+'/' + version
                 is_dl1 = len(glob.glob(dl1_path+'/'+'*.h5'))
             if not is_dl2:
                 dl2_path = base_path_source + '/dl2/' + version
@@ -356,7 +372,7 @@ def main():
                 stereo=True
             
             if is_dl1:
-                dl1_files = make_file_list(dl1_path, stereo=stereo, level='dl1')
+                dl1_files = make_file_list(dl1_path, stereo=stereo, level=dl1_tab_data_level)
             if is_dl2:
                 dl2_files = make_file_list(dl2_path, stereo=stereo, level='dl2')
             
@@ -565,9 +581,11 @@ def main():
                     ax9[1].pcolormesh(X, Y, h22_tot)
 
             # DL3 Datastore
+            plot_theta2 = False
             if is_dl3:
                 try:
                     target_coords = SkyCoord.from_name(source)
+                    plot_theta2 = True
                 except:
                     logging.info('%s coordinates cannot be guessed authomaticaly, using source catalog file %s.', source, source_catalog_file)
                     if is_catalog:
@@ -580,6 +598,7 @@ def main():
                                     frame='icrs'
                                     )
                                 logging.info('ra: %f, dec: %f', source_catalog[source]['ra'], source_catalog[source]['dec'])
+                                plot_theta2 = True
                             elif source_catalog[source]['frame'] == 'galactic':
                                 target_coords = SkyCoord(
                                     l=source_catalog[source]['l']*u.deg, 
@@ -587,52 +606,53 @@ def main():
                                     frame='galactic'
                                     )
                                 logging.info('l: %f, b: %f', source_catalog[source]['l'], source_catalog[source]['b'])
-
-                            theta2_axis = MapAxis.from_bounds(0, 0.5, nbin=10, interp="lin", unit="deg2")
-                            theta_cut = 0.2 * u.deg
-                            counts_on, counts_off, alpha, event_counts = get_theta2_from_dl3(
-                                dl3_path, 
-                                target_coords=target_coords, 
-                                theta2_axis=theta2_axis, 
-                                theta_cut=theta_cut
-                                )
-                            if tt == 21:
-                                ax13[0].set_title('tel1')
-                                plot_theta2_dl3(
-                                    ax=ax13[0], 
-                                    theta2_axis=theta2_axis, 
-                                    counts_on=counts_on, 
-                                    counts_off=counts_off, 
-                                    alpha=alpha, 
-                                    theta_cut=theta_cut, 
-                                    event_counts=event_counts
-                                    )
-                            elif tt == 22:
-                                ax13[1].set_title('tel2')
-                                plot_theta2_dl3(
-                                    ax=ax13[1], 
-                                    theta2_axis=theta2_axis, 
-                                    counts_on=counts_on, 
-                                    counts_off=counts_off, 
-                                    alpha=alpha, 
-                                    theta_cut=theta_cut, 
-                                    event_counts=event_counts
-                                    )                
-                            else:
-                                ax13[2].set_title('stereo')
-                                plot_theta2_dl3(
-                                    ax=ax13[2], 
-                                    theta2_axis=theta2_axis, 
-                                    counts_on=counts_on, 
-                                    counts_off=counts_off, 
-                                    alpha=alpha, 
-                                    theta_cut=theta_cut, 
-                                    event_counts=event_counts
-                                    )
+                                plot_theta2 = True
                         else:
                             logging.warning('Source %s not found in the source catalog, unknown source coords, skipping theta2 figures.', source)
                     else:
                         logging.warning('Source catalog file %s not found, unknown source coords, skipping theta2 figures.', source_catalog_file)
+                if plot_theta2:
+                    theta2_axis = MapAxis.from_bounds(0, 0.5, nbin=10, interp="lin", unit="deg2")
+                    theta_cut = 0.2 * u.deg
+                    counts_on, counts_off, alpha, event_counts = get_theta2_from_dl3(
+                        dl3_path, 
+                        target_coords=target_coords, 
+                        theta2_axis=theta2_axis, 
+                        theta_cut=theta_cut
+                        )
+                    if tt == 21:
+                        ax13[0].set_title('tel1')
+                        plot_theta2_dl3(
+                            ax=ax13[0], 
+                            theta2_axis=theta2_axis, 
+                            counts_on=counts_on, 
+                            counts_off=counts_off, 
+                            alpha=alpha, 
+                            theta_cut=theta_cut, 
+                            event_counts=event_counts
+                            )
+                    elif tt == 22:
+                        ax13[1].set_title('tel2')
+                        plot_theta2_dl3(
+                            ax=ax13[1], 
+                            theta2_axis=theta2_axis, 
+                            counts_on=counts_on, 
+                            counts_off=counts_off, 
+                            alpha=alpha, 
+                            theta_cut=theta_cut, 
+                            event_counts=event_counts
+                            )                
+                    else:
+                        ax13[2].set_title('stereo')
+                        plot_theta2_dl3(
+                            ax=ax13[2], 
+                            theta2_axis=theta2_axis, 
+                            counts_on=counts_on, 
+                            counts_off=counts_off, 
+                            alpha=alpha, 
+                            theta_cut=theta_cut, 
+                            event_counts=event_counts
+                            )
             if is_dist:
                 histograms, histograms_diff, _, _, livetimes, survived_ped, bins = load_distributions_sst1m(dist_path=dist_path, dl3_path=dl3_path)
 
