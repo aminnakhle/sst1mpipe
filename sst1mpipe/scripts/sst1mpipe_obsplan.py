@@ -35,7 +35,7 @@ from sst1mpipe.io import (
     load_config,
     check_outdir
 )
-from sst1mpipe.utils import get_location
+from sst1mpipe.utils import get_location, get_moon_phase
 
 from astropy.time import Time
 import astropy.units as u
@@ -149,13 +149,14 @@ def main():
 
     sun_altaz = get_sun(time_span).transform_to(frame_night)
     moon_altaz = get_moon(time_span).transform_to(frame_night)
+    phase_angle_moon = get_moon_phase(times=midnight, loc=location)
 
     mask_sunset = sun_altaz.alt < -0*u.deg
     mask_nautical = sun_altaz.alt < -12*u.deg
     mask_astronomical = sun_altaz.alt < -18*u.deg
 
     fig, ax = plt.subplots(1, 1, figsize=(7, 5))
-    plt.plot((time_span + utc_shift).datetime, moon_altaz.alt, color='k', ls='--', label='Moon')
+    plt.plot((time_span + utc_shift).datetime, moon_altaz.alt, color='k', ls='--', label='Moon (phase = '+str(round(phase_angle_moon.to_value(u.deg), 1))+' deg)')
     plt.fill_between((time_span + utc_shift).datetime, 0, 90, mask_sunset, color='0.5', zorder=0, alpha=0.5) # civil twilight
     plt.fill_between((time_span + utc_shift).datetime, 0, 90, mask_nautical, color='0.2', zorder=0, alpha=0.5) # nautical twilight
     plt.fill_between((time_span + utc_shift).datetime, 0, 90, mask_astronomical, color='k', zorder=0, alpha=0.5) # astronomical twilight

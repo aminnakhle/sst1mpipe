@@ -1387,6 +1387,7 @@ def moon_phase_angle(time):
     return np.arctan2(sun.distance*np.sin(elongation),
                       moon.distance - sun.distance*np.cos(elongation))
 
+
 def get_moon_params(data, config=None, tel=None, thinning=100):
     
     location = get_location(config=config, tel=tel)
@@ -1765,3 +1766,30 @@ def get_sources_in_dir(base_path):
     for source in sources:
         logging.info(source)
     return sources
+
+def get_moon_phase(times=None, loc=None):
+    """
+    Returns phase of the Moon (0 is new moon)
+
+    Parameters
+    ----------
+    times: 
+        astropy.time.Time
+    loc: 
+        astropy.coordinates.EarthLocation
+
+    Returns
+    -------
+    phase_angle_moon: astropy.units.quantity.Quantity
+
+    """
+    sun_vec_gcrs = get_sun(times).cartesian
+    moon_vec_gcrs = get_moon(times).cartesian
+    gnd_loc_gcrs = loc.get_gcrs(times).cartesian.without_differentials()
+    sun_to_moon = sun_vec_gcrs - moon_vec_gcrs
+    gnd_to_moon = gnd_loc_gcrs - moon_vec_gcrs
+    sun_to_moon_unit = sun_to_moon / sun_to_moon.norm()
+    gnd_to_moon_unit = gnd_to_moon / gnd_to_moon.norm()
+    phase_angle_moon = np.rad2deg(np.arccos(sun_to_moon_unit.dot(gnd_to_moon_unit)))
+
+    return phase_angle_moon
