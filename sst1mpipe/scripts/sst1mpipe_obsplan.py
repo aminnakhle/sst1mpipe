@@ -2,7 +2,10 @@
 
 """
 Script to calculate observability of any source from the catalog
-for a single particular night. If no date is specified, the following
+for a single particular night. If one wants to quickly see the
+observability of a single source, which does not need to be put
+in the catalog (some transient for example), the coordinates may 
+be specified independently. If no date is specified, the following
 night is the default. Any source in the catalog can be removed from 
 plotting/calculation if obsplan_show: false. The script plots source
 visibility and moon distance and stores the figure in the output dir.
@@ -18,7 +21,8 @@ $> python sst1mpipe_obsplan.py
 --config sst1mpipe_config.json
 --min-moon-dist 50.
 --max-zenith 50.
-
+--ra 350.
+--dec 75.
 """
 
 import argparse
@@ -71,7 +75,6 @@ def parse_args():
     parser.add_argument('--source-catalog', action='store', type=str,
                         dest='source_cat',
                         help='Path to a json file with catalog of all observed SST1M targets.',
-                        required=True
                         )
 
     parser.add_argument('--config', '-c', action='store', type=str,
@@ -92,7 +95,18 @@ def parse_args():
                         type=float,
                         help='Maximum zenith angle (deg) for calculation of observability window.',
                         )
-
+    parser.add_argument(
+                        '--ra',
+                        dest='ra',
+                        type=float,
+                        help='Right ascention (deg) for a quick check of a source of interest if one does not want to have it in catalog.',
+                        )                    
+    parser.add_argument(
+                        '--dec',
+                        dest='dec',
+                        type=float,
+                        help='Declination (deg) for a quick check of a source of interest if one does not want to have it in catalog.',
+                        )   
     args = parser.parse_args()
     return args
 
@@ -107,6 +121,8 @@ def main():
     max_zenith = args.max_zenith * u.deg
     min_alt = 90.*u.deg - max_zenith
     out_dir = args.out_dir
+    ra = args.ra
+    dec = args.dec
 
     check_outdir(out_dir)
 
@@ -123,15 +139,24 @@ def main():
     try:
         source_catalog = load_source_catalog(source_catalog_file)
     except:
-        logging.error('Source catalog file not found!')
-        sys.exit()
+        logging.warning('Source catalog file not found!')
+        source_catalog = {}
+    if (ra is not None) and (dec is not None):
+        if len(source_catalog) == 0:
+            source_catalog = {'NEW': {'ra': 0}}
+        source_catalog['NEW']['ra'] = ra
+        source_catalog['NEW']['dec'] = dec
+        source_catalog['NEW']['frame'] = 'icrs'
+        source_catalog['NEW']['obsplan_show'] = True
+    if len(source_catalog) == 0:
+        logging.error('No source specified! Either provide a catalog file, or ra/dec of some source, or both.')
 
     if date is None:
         tonight_datetime = Time.now()
         tonight = tonight_datetime.datetime.strftime("%Y-%m-%d")
     else:
         tonight = str(date[:4]) + '-' + str(date[4:6]) + '-' + str(date[6:])
-    print('\nCalculating source visibilities for night starting on', tonight)
+    print('\nCalculating source visibilities for night starting on', tonight, '\n')
 
     utc_shift = (datetime.now() - datetime.utcnow()).seconds / 3600 * u.hour
     if utc_shift > 1.5 * u.hour:
@@ -161,35 +186,36 @@ def main():
     plt.fill_between((time_span + utc_shift).datetime, 0, 90, mask_nautical, color='0.2', zorder=0, alpha=0.5) # nautical twilight
     plt.fill_between((time_span + utc_shift).datetime, 0, 90, mask_astronomical, color='k', zorder=0, alpha=0.5) # astronomical twilight
 
+    time_span.format = 'iso'
     sunset = min(time_span[mask_sunset] + utc_shift)
-    print(('\nSunset ' + scale + ': ').ljust(31), sunset)
+    print(('\nSunset'.ljust(23) + scale + ': ').ljust(31), get_time_formated(sunset))
 
     if sum(mask_nautical):
         nautical_twilight_evening = min(time_span[mask_nautical] + utc_shift)
-        print(('Nautical evening ' + scale + ': ').ljust(30), nautical_twilight_evening)
+        print(('Nautical evening'.ljust(22) + scale + ': ').ljust(30), get_time_formated(nautical_twilight_evening))
     else:
-        print(('Nautical evening ' + scale + ': ').ljust(30), 'None')
+        print(('Nautical evening'.ljust(22) + scale + ': ').ljust(30), 'None')
 
     if sum(mask_astronomical):
         astronomical_twilight_evening = min(time_span[mask_astronomical] + utc_shift)
-        print(('Astronomical evening ' + scale + ': ').ljust(30), astronomical_twilight_evening)
+        print(('Astronomical evening'.ljust(22) + scale + ': ').ljust(30), get_time_formated(astronomical_twilight_evening))
     else:
-        print(('Astronomical evening ' + scale + ': ').ljust(30), 'None')
+        print(('Astronomical evening'.ljust(22) + scale + ': ').ljust(30), 'None')
 
     if sum(mask_astronomical):
         astronomical_twilight_morning = max(time_span[mask_astronomical] + utc_shift)
-        print(('\nAstronomical morning ' + scale + ': ').ljust(31), astronomical_twilight_morning)
+        print(('\nAstronomical morning'.ljust(23) + scale + ': ').ljust(31), get_time_formated(astronomical_twilight_morning))
     else:
-        print(('\nAstronomical morning ' + scale + ': ').ljust(31), 'None')
+        print(('\nAstronomical morning'.ljust(23) + scale + ': ').ljust(31), 'None')
 
     if sum(mask_nautical):
         nautical_twilight_morning = max(time_span[mask_nautical] + utc_shift)
-        print(('Nautical morning ' + scale + ': ').ljust(30), nautical_twilight_morning)
+        print(('Nautical morning'.ljust(22) + scale + ': ').ljust(30), get_time_formated(nautical_twilight_morning))
     else:
-        print(('Nautical morning ' + scale + ': ').ljust(30), 'None')
+        print(('Nautical morning'.ljust(22) + scale + ': ').ljust(30), 'None')
 
     sunrise = max(time_span[mask_sunset] + utc_shift)
-    print(('Sunrise ' + scale + ': ').ljust(30), sunrise)
+    print(('Sunrise'.ljust(22) + scale + ': ').ljust(30), get_time_formated(sunrise))
 
     print('\nObservability windows for different sources. Min altitude ('+str(min_alt.to_value(u.deg))+' deg), min Moon distance ('+str(min_moon_dist.to_value(u.deg))+' deg) taken into account.')
     print('ASTRO .. obs during astronomical night, NAUT .. obs during nautical night.')
@@ -226,7 +252,7 @@ def main():
                         )
 
             # printing observability windows
-            print('\n'+source)
+            print('\n## '+source)
             moon_distance_detailed = source_altaz.separation(get_moon(time_span).transform_to(frame_night))
             mask_moon = moon_distance_detailed > min_moon_dist
             mask_zenith = source_altaz.alt > min_alt
@@ -234,13 +260,23 @@ def main():
             mask_naut = mask_moon * mask_zenith * mask_nautical
 
             if sum(mask_astro):
-                print('ASTRO', scale, min(time_span[mask_astro] + utc_shift), max(time_span[mask_astro] + utc_shift))
+                print(  'ASTRO'.ljust(5), 
+                        scale.ljust(10), 
+                        get_time_formated(min(time_span[mask_astro] + utc_shift)), 
+                        ' - ',
+                        get_time_formated(max(time_span[mask_astro] + utc_shift))
+                        )
             else:
-                print('ASTRO', 'None')
+                print('ASTRO'.ljust(5), 'None')
             if sum(mask_naut):
-                print('NAUT', scale, min(time_span[mask_naut] + utc_shift), max(time_span[mask_naut] + utc_shift))
+                print(  'NAUT'.ljust(5), 
+                        scale.ljust(10), 
+                        get_time_formated(min(time_span[mask_naut] + utc_shift)), 
+                        ' - ',
+                        get_time_formated(max(time_span[mask_naut] + utc_shift))
+                        )
             else:
-                print('NAUT', 'None')
+                print('NAUT'.ljust(5), 'None')
 
     #plt.setp(plt.gca().xaxis.get_majorticklabels(), rotation=45)
     myFmt = mdates.DateFormatter('%H:%M')
@@ -255,6 +291,15 @@ def main():
     plt.legend()
     fig.savefig(out_dir + '/' + 'sst1m_observability_'+ tonight +'.png', dpi=250)
     plt.show()
+
+def get_time_formated(time, format="hhmm"):
+
+    time_hhmmss = time.to_string().split(' ')[1]
+    time_hhmm = time_hhmmss.split(":")[0] + ":" + time_hhmmss.split(":")[1]
+    if format == "hhmm":
+        return time_hhmm
+    elif format == "hhmmss":
+        return time_hhmmss
 
 if __name__ == "__main__":
     main()
