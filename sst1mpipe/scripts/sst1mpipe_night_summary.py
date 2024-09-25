@@ -445,7 +445,7 @@ def main():
                         dl1_stereo_1,_ = load_files(dl1_files[i*bunch_size:bunch_size*(i+1)], tel='tel_021', level='dl1', stereo=stereo)
                         dl1_stereo_2,_ = load_files(dl1_files[i*bunch_size:bunch_size*(i+1)], tel='tel_022', level='dl1', stereo=stereo)
                         # Trigger rates
-                        if (len(dl1_stereo_1) > 0) and (len(dl1_stereo_2) > 0):
+                        if (len(dl1_stereo_1) > 0) and (len(dl1_stereo_1) == len(dl1_stereo_2)):
                             h1 = np.histogram(dl1_stereo_1.local_time, bins=dl1_rate_bins)
                             h_tot += h1[0]
                             # CoG - DL1 stereo, survived cleaning
@@ -465,7 +465,7 @@ def main():
                     # last bunch
                     dl1_stereo_1,_ = load_files(dl1_files[bunch_size*(i+1):], tel='tel_021', level='dl1', stereo=stereo)
                     dl1_stereo_2,_ = load_files(dl1_files[bunch_size*(i+1):], tel='tel_022', level='dl1', stereo=stereo)
-                    if (len(dl1_stereo_1) > 0) and (len(dl1_stereo_2) > 0):
+                    if (len(dl1_stereo_1) > 0) and (len(dl1_stereo_1) == len(dl1_stereo_2)):
                         h1 = np.histogram(dl1_stereo_1.local_time, bins=dl1_rate_bins)
                         h_tot += h1[0]
                         h11, xedges, yedges = np.histogram2d(dl1_stereo_1['camera_frame_hillas_x'].dropna(), dl1_stereo_1['camera_frame_hillas_y'].dropna(), bins=100, range=[[-0.5, 0.5], [-0.5, 0.5]])
