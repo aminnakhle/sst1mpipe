@@ -56,14 +56,14 @@ import logging
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Makes run summary PDF for all sources observed during a single night.")
+    parser = argparse.ArgumentParser(description="Plots observability of selected catalog sources for a single night of interest and calculates the observability windows.")
 
     parser.add_argument(
                         '--date',
                         dest='date',
                         default=None,
                         type=str,
-                        help='Date of the observing night (YYYYMMDD). If not specified today is default.',
+                        help='Date of the observing night (YYYYMMDD). If not specified coming night is default (but be careful when running it after midnight!).',
                         )
     parser.add_argument(
                         '--out-dir', '-o',

@@ -97,7 +97,9 @@ class sliding_pedestals:
         return
 
     def load_firsts_pedestals(self,max_n_ped=50,max_evt=1000):
-
+        """
+        Reads first max_n_ped pedestal events in the buffer.
+        """
 
         data_stream = SST1MEventSource([self.input_file],
                                        max_events=max_evt)
@@ -110,7 +112,11 @@ class sliding_pedestals:
                 break
     
     def load_firsts_fake_pedestals(self, max_evt=10):
-        
+        """
+        Reads first max_evt fake pedestal events in the buffer.
+        Fake pedestal is a shower event with Cherenkov pixels masked out.
+        """
+
         source = SST1MEventSource([self.input_file],
                                        max_events=max_evt)
         source._subarray = get_subarray()
