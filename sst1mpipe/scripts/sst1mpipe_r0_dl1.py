@@ -205,13 +205,13 @@ def main():
     config = load_config(args.config_file, ismc=ismc)
 
     if ismc:
-        source = EventSource( processing_info.input_file, max_events=max_events, allowed_tels=config["allowed_tels"])
+        source = EventSource(processing_info.input_file, max_events=max_events, allowed_tels=config["allowed_tels"])
 
         logging.info("Tel 1 Intensity correction factor: {}".format(config['NsbCalibrator']['intensity_correction']['tel_001']))
         logging.info("Tel 2 Intensity correction factor: {}".format(config['NsbCalibrator']['intensity_correction']['tel_002']))
 
     else:
-        source = SST1MEventSource([ processing_info.input_file], max_events=max_events)
+        source = SST1MEventSource([processing_info.input_file], max_events=max_events)
         source._subarray = get_subarray()
 
         logging.info("Tel 1 Intensity correction factor: {}".format(config['NsbCalibrator']['intensity_correction']['tel_021']))
