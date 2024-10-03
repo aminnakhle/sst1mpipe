@@ -27,9 +27,11 @@ from sst1mpipe.io import load_config
 from sst1mpipe.io import (
     load_dl1_sst1m,
     load_dl2_sst1m,
-    check_outdir
+    check_outdir,
+    load_dl1_pedestals
 )
 from sst1mpipe.utils import get_telescopes
+from sst1mpipe.utils.NSB_tools import VAR_to_NSB
 
 from gammapy.data import DataStore
 
@@ -122,7 +124,7 @@ def main():
             break
 
     tel = tels[0]
-    dl1_data, ped_fractions, recleaned_fractions, times = load_data(files, logs, config=None, tel=tel, data_level='dl1')
+    dl1_data, ped_fractions, recleaned_fractions, times, nsb = load_data(files, logs, config=None, tel=tel, data_level='dl1')
 
     # iterate over obsids for given date and split data
     for obsid in obsids_date:
@@ -146,6 +148,7 @@ def main():
 
         ped_fraction_mean = np.mean(ped_fractions[time_mask_ped])
         recleaned_fraction_mean = np.mean(recleaned_fractions[time_mask_ped])
+        nsb_per_dl3 = np.mean(nsb[time_mask_ped])
     
         rate = data / t_elapsed
         differential_rate = rate / bins_width
@@ -162,6 +165,8 @@ def main():
         ped_table['survived_pedestal_frac'] = np.array([ped_fraction_mean])
         rec_table = QTable()
         rec_table['recleaned_fraction'] = np.array([recleaned_fraction_mean])
+        nsb_table = QTable()
+        nsb_table['NSB'] = np.array([nsb_per_dl3])
 
         # Save all to output tables
         table = get_table(rate, differential_rate, bin_edges=bin_edges)
@@ -174,6 +179,7 @@ def main():
         write_table_hdf5(tt_table, outfile, path='timestamp', overwrite=True, append=True, serialize_meta=True)
         write_table_hdf5(ped_table, outfile, path='survived_pedestal_frac', overwrite=True, append=True, serialize_meta=True)
         write_table_hdf5(rec_table, outfile, path='recleaned_fraction', overwrite=True, append=True, serialize_meta=True)
+        write_table_hdf5(nsb_table, outfile, path='NSB', overwrite=True, append=True, serialize_meta=True)
 
 def get_table(rate, diff_rate, bin_edges=None):
 
@@ -192,6 +198,7 @@ def load_data(files, logs, config=None, tel=None, data_level='dl1'):
     ped_fractions = []
     recleaned_fractions = []
     times = []
+    nsb = []
     
     for input_file in files:
         try:
@@ -227,6 +234,15 @@ def load_data(files, logs, config=None, tel=None, data_level='dl1'):
         except:
             print('Broken file: ' + input_file + ', skipping.')
             continue
+        try:
+            pt = load_dl1_pedestals(input_file)
+            if '1' in tel: cs=21
+            else: cs=22
+            NSB = VAR_to_NSB(pt['pedestal_charge_std'].mean(axis=1)**2, cs)
+            nsb.append(NSB.mean())
+        except:
+            print('No pedestals in : ' + input_file + ', skipping.')
+
         if i == 0:
             data = df
             i += 1
@@ -236,7 +252,8 @@ def load_data(files, logs, config=None, tel=None, data_level='dl1'):
     ped_fractions = np.array(ped_fractions)
     recleaned_fractions = np.array(recleaned_fractions)
     times = np.array(times)
-    return data, ped_fractions, recleaned_fractions, times
+    nsb = np.array(nsb)
+    return data, ped_fractions, recleaned_fractions, times, nsb
 
 if __name__ == '__main__':
     main()
