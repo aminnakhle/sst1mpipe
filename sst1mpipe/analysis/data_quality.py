@@ -13,7 +13,6 @@ import glob
 import astropy.units as u
 import astropy.constants as c
 
-from astropy.coordinates import SkyCoord, AltAz
 from astropy.time import Time
 from astropy.io import fits
 from astropy.table import Table, vstack
