@@ -358,7 +358,7 @@ def run_daily_ana(daily_config):
             cs1_dl3_dir = os.path.join(cs1_dir,'dl3')
             Path(cs1_dl3_dir).mkdir(exist_ok=True)
 
-            cs1_dqual_dir = os.path.join(cs1_dir,'data_quality')
+            cs1_dqual_dir = os.path.join(cs1_dir,'distributions')
             Path(cs1_dqual_dir).mkdir(exist_ok=True)
 
         ## CS2
@@ -375,7 +375,7 @@ def run_daily_ana(daily_config):
             cs2_dl3_dir = os.path.join(cs2_dir,'dl3')
             Path(cs2_dl3_dir).mkdir(exist_ok=True)
 
-            cs2_dqual_dir = os.path.join(cs2_dir,'data_quality')
+            cs2_dqual_dir = os.path.join(cs2_dir,'distributions')
             Path(cs2_dqual_dir).mkdir(exist_ok=True)
 
 
@@ -393,7 +393,7 @@ def run_daily_ana(daily_config):
             stereo_dl3_dir = os.path.join(stereo_dir,'dl3')
             Path(stereo_dl3_dir).mkdir(exist_ok=True)
 
-            stereo_dqual_dir = os.path.join(stereo_dir,'data_quality')
+            stereo_dqual_dir = os.path.join(stereo_dir,'distributions')
             Path(stereo_dqual_dir).mkdir(exist_ok=True)
 
 
