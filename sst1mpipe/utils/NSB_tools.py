@@ -17,13 +17,15 @@ from sst1mpipe.io.sst1m_event_source import SST1MEventSource
 import glob
 
 ## spline aprox NSB : VAR[ADC]->SHIFT[ADC]
-## these are rough aprox.. To be updated!
 
-TCK1 = (np.array([0.        ,  0.        , 43.65192388, 62.89172074, 67.91267773,
-                  72.96316339, 73.42825723, 73.88641097, 73.88641097]),
-        np.array([-4.33760412, 29.75088614, 53.56764605, 64.52243001, 79.39786228,
-                  85.76278027, 89.85345909,  0.        ,  0.        ]),
-        1)
+
+
+TCK1 = (np.array([ 0.        ,  0.        ,  0.        , 46.96969697, 60.90909091,
+                   67.57575758, 74.24242424, 74.24242424, 74.24242424]),
+        np.array([ -0.4367913 ,   9.08788226,  39.66927065,  54.18389959,
+                   69.24518367, 104.29418015,   0.        ,   0.        ,
+                   0.        ]),
+        2)
 
 
 TCK2=(np.array([0.        ,   0.        ,  93.74735497, 126.46232902,
@@ -85,6 +87,18 @@ def VAR_to_Idrop(baseline_VAR,ntel):
     except:
         print("ERROR ntel should be 21 or 22")
     return VAR_to_shift(baseline_VAR,ntel)*slope+1
+
+def BLS_to_Idrop(baseline_shift,ntel):
+    ## X-talk not included yet
+    ## Usage :
+    ## I_corr = I / I_drop
+    try:
+        slope   = Vdrop_lin_aprox['gain_tel{}'.format(ntel)]+ \
+                  Vdrop_lin_aprox['PDE_tel{}'.format(ntel)]
+    except:
+        print("ERROR ntel should be 21 or 22")
+    return baseline_shift*slope+1
+
 
 def VAR_to_Gdrop(baseline_VAR,ntel):
     ## Usage :
@@ -179,6 +193,7 @@ def get_dark_baseline(filename,max_evt=500,event_type=8):
         raw_baselines  = np.array(raw_baselines)
         
         return raw_baselines.mean(axis=(1,2))
+
 ############
  #### tools to plot data :
 ############
@@ -224,12 +239,12 @@ def get_ped_table_low_res(file_list):
     return bline_table
 
 
-def plot_average_nsb_VS_time(ped_table,ntel,ax=None, color='blue', label=None):
+def plot_average_nsb_VS_time(ped_table,ntel,ax=None):
     NSB = VAR_to_NSB(ped_table['pedestal_charge_std'].mean(axis=1)**2,ntel)
     Dates = [Time(t,scale='utc',format='unix').to_datetime() for t in  ped_table['pedestal_sample_time']]
     if ax is None:
         f,ax = plt.subplots(figsize=(10,5))
-    ax.plot(Dates,NSB,'.',label=label, color=color)
+    ax.plot(Dates,NSB,'.',label='tel {}'.format(ntel%20))
     plt.xlabel('Time')
     plt.ylabel('NSB [MHz]')
     return ax

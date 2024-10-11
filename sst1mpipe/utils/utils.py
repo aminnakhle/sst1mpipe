@@ -21,6 +21,9 @@ import h5py
 import logging
 import tables
 import os
+from datetime import datetime
+import matplotlib.pyplot as plt
+from gammapy.data import DataStore
 from astroquery.simbad import Simbad
 import pkg_resources
 from os import path
@@ -1793,3 +1796,53 @@ def get_moon_phase(times=None, loc=None):
     phase_angle_moon = np.rad2deg(np.arccos(sun_to_moon_unit.dot(gnd_to_moon_unit)))
 
     return phase_angle_moon
+
+def plot_livetime(hdu_dir,objects=None,ignore_sources=[]):
+    """
+    Plot total livetime from hdu_dir gammapy Datastore
+
+    Parameters
+    ----------
+    hdu_dir: str
+        directory of HDU tables
+    objects: list
+        list of target, if None, will list all target in datasore
+    ignore_sources : list
+        list of source to ignore
+    Returns
+    -------
+    pyplot figure, axis 
+
+    """
+    plt.rcParams['font.family'] = 'monospace'
+
+    data_store_path = "/data/work/analysis/Daily_analysis/full_hdu_tables/stereo/"
+    ds = DataStore.from_dir(data_store_path)
+    ds.obs_table.sort('OBS_ID')
+    if objects is None:
+        objects = np.unique(ds.obs_table['OBJECT'])
+    
+    d_obs=dict({})
+
+    for obj in objects:
+
+            d_obs[obj]  = np.array([ds.obs_table['TSTOP'][ds.obs_table['OBJECT']==obj],
+                                    ds.obs_table['LIVETIME'][ds.obs_table['OBJECT']==obj]])
+
+    f,ax = plt.subplots(figsize=(10,4))
+    plt.plot([datetime.fromtimestamp(t) for t in ds.obs_table['TSTOP']],
+             [np.sum(ds.obs_table['LIVETIME'][:ii])/60/60 for ii in range(len(ds.obs_table['LIVETIME']))],
+             color="black",
+             label=r'{} : {:} h'.format("total".ljust(11),np.round(ds.obs_table['LIVETIME'].sum()/60/60,1)))
+
+    for obj in objects:
+        if obj not in ignore:
+            plt.plot([datetime.fromtimestamp(t) for t in d_obs[obj][0]],
+                     [np.sum(d_obs[obj][1][:ii])/60/60 for ii in range(len(d_obs[obj][1]))],
+                     label=r'{} : {:} h'.format(obj.ljust(11),np.round(np.sum(d_obs[obj][1])/60/60,1)))
+    plt.legend()
+    plt.grid()
+    plt.ylabel('observation time [h]')
+    plt.xticks(rotation=45)
+    return f,ax
+
