@@ -1815,9 +1815,7 @@ def plot_livetime(hdu_dir,objects=None,ignore_sources=[]):
 
     """
     plt.rcParams['font.family'] = 'monospace'
-
-    data_store_path = "/data/work/analysis/Daily_analysis/full_hdu_tables/stereo/"
-    ds = DataStore.from_dir(data_store_path)
+    ds = DataStore.from_dir(hdu_dir)
     ds.obs_table.sort('OBS_ID')
     if objects is None:
         objects = np.unique(ds.obs_table['OBJECT'])
