@@ -89,7 +89,7 @@
 
     "NsbCalibrator": {
         "apply_pixelwise_Vdrop_correction": false,
-        "apply_global_Vdrop_correction": false,
+        "apply_global_Vdrop_correction": true,
         "intensity_correction": {
           "tel_021": 1.0,
           "tel_022": 1.0
@@ -119,29 +119,19 @@
                 "tel_021": [
                 {
                     "min_nsb_level": 0,
-                    "stdev_scaling": 2.5,
-                    "picture_threshold_pe": 7,
-                    "boundary_threshold_pe": 2.5,
+                    "stdev_scaling": 2,
+                    "picture_threshold_pe": 5.5,
+                    "boundary_threshold_pe": 2,
                     "min_picture_neighbors": 2,
                     "keep_isolated": false,
                     "min_time_neighbors" : 1,
                     "time_limit_ns" : 8,
                     "only_main_island" : false
                 }, {
-                    "min_nsb_level": 2.3526,
-                    "stdev_scaling": 2.5,
-                    "picture_threshold_pe": 8,
-                    "boundary_threshold_pe": 4,
-                    "min_picture_neighbors": 2,
-                    "keep_isolated": false,
-                    "min_time_neighbors" : 1,
-                    "time_limit_ns" : 8,
-                    "only_main_island" : false
-                }, {
-                    "min_nsb_level": 2.8863,
-                    "stdev_scaling": 2.5,
-                    "picture_threshold_pe": 8,
-                    "boundary_threshold_pe": 4,
+                    "min_nsb_level": 2.3554,
+                    "stdev_scaling": 2,
+                    "picture_threshold_pe": 6.9,
+                    "boundary_threshold_pe": 2,
                     "min_picture_neighbors": 2,
                     "keep_isolated": false,
                     "min_time_neighbors" : 1,
@@ -151,29 +141,19 @@
                 "tel_022": [
                 {
                     "min_nsb_level": 0,
-                    "stdev_scaling": 2.5,
-                    "picture_threshold_pe": 8,
+                    "stdev_scaling": 2,
+                    "picture_threshold_pe": 5.7,
+                    "boundary_threshold_pe": 2,
+                    "min_picture_neighbors": 2,
+                    "keep_isolated": false,
+                    "min_time_neighbors" : 1,
+                    "time_limit_ns" : 8,
+                    "only_main_island" : false
+                }, {
+                    "min_nsb_level": 2.4287,
+                    "stdev_scaling": 2,
+                    "picture_threshold_pe": 6.9,
                     "boundary_threshold_pe": 2.5,
-                    "min_picture_neighbors": 2,
-                    "keep_isolated": false,
-                    "min_time_neighbors" : 1,
-                    "time_limit_ns" : 8,
-                    "only_main_island" : false
-                }, {
-                    "min_nsb_level": 2.5288,
-                    "stdev_scaling": 2.5,
-                    "picture_threshold_pe": 8,
-                    "boundary_threshold_pe": 4,
-                    "min_picture_neighbors": 2,
-                    "keep_isolated": false,
-                    "min_time_neighbors" : 1,
-                    "time_limit_ns" : 8,
-                    "only_main_island" : false
-                }, {
-                    "min_nsb_level": 3.2747,
-                    "stdev_scaling": 2.5,
-                    "picture_threshold_pe": 8,
-                    "boundary_threshold_pe": 4,
                     "min_picture_neighbors": 2,
                     "keep_isolated": false,
                     "min_time_neighbors" : 1,
@@ -285,25 +265,19 @@
         "tel_021": [
           {
             "mean_charge_bin_low": 0,
-            "nsb_rate": 80
+            "nsb_rate": "low"
           }, {
-            "mean_charge_bin_low": 2.3526,
-            "nsb_rate": 150
-          }, {
-            "mean_charge_bin_low": 2.8863,
-            "nsb_rate": 270
+            "mean_charge_bin_low": 2.3554,
+            "nsb_rate": "med"
           }
         ],
         "tel_022": [
           {
             "mean_charge_bin_low": 0,
-            "nsb_rate": 80
+            "nsb_rate": "low"
           }, {
-            "mean_charge_bin_low": 2.5288,
-            "nsb_rate": 150
-          }, {
-            "mean_charge_bin_low": 3.2747,
-            "nsb_rate": 270
+            "mean_charge_bin_low": 2.4287,
+            "nsb_rate": "med"
           }
         ]
       }
