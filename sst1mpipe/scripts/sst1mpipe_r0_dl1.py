@@ -170,7 +170,7 @@ def main():
     pixel_charges = args.pixel_charges
     reclean = args.reclean
     precise_timestamps = args.precise_timestamps
-   
+
     ismc = processing_info.guess_mc()
 
     if ismc:
@@ -244,11 +244,17 @@ def main():
         for key, value in config['ImageProcessor'][cleaner]['telescope_defaults'].items():
             config['ImageProcessor'][cleaner]['telescope_defaults'][key] = sorted(value, key=lambda x: x['min_nsb_level'], reverse=True)
 
+        for key, value in config['mean_charge_to_nsb_rate'].items():
+            config['mean_charge_to_nsb_rate'][key] = sorted(value, key=lambda x: x['mean_charge_bin_low'], reverse=True)
+
+        image_processor.clean.nsb_level = np.mean(pedestal_info.get_img_charge_mean())
+        image_processor.clean.config = config['ImageProcessor'][cleaner]
+        ped_mean_charge = np.ndarray(shape=[0,3])
+
     if reclean:
         dl1_charges = read_charge_images(input_file_px_charges)
         dl1_charges = dl1_charges[dl1_charges['n'] > config['ImageProcessor'][cleaner]['min_number_pedestals']]
         dl1_charges['mean_charge'] = np.average(dl1_charges['average_q'], axis=1)
-        ped_mean_charge = np.ndarray(shape=[0,3])
 
     shower_processor  = ShowerProcessor(subarray=source.subarray, config=config)
 
@@ -293,6 +299,13 @@ def main():
                     tel_string = get_tel_string(tel, mc=False)
                     location = get_location(config=config, tel=tel_string)
                     swap_modules = get_swap_flag(event)
+                    charge_to_nsb = config['mean_charge_to_nsb_rate'][tel_string]
+                    for setting in charge_to_nsb:
+                        min_charge = setting['mean_charge_bin_low']
+                        nsb_rate = setting['nsb_rate']
+                        if image_processor.clean.nsb_level >= min_charge:
+                            break
+                    logging.info('Average charge from the first batch of pedestal events is %f which corresponds to NSB level %s in %s', image_processor.clean.nsb_level, nsb_rate, tel_string)
 
                 event.trigger.tels_with_trigger = [tel]
 
@@ -338,6 +351,13 @@ def main():
             # Default is NeighborAverage, but can be turned off with 'null'
             event = remove_bad_pixels(event, config=config)
 
+            if (not reclean) and pedestal_info.pedestals_in_file:
+                # ALWAYS use adaptive cleaning - take data from online pedestal_info
+                image_processor.clean.average_charge = pedestal_info.get_img_charge_mean()
+                image_processor.clean.stdev_charge = pedestal_info.get_img_charge_std()
+                # in the current setup this value is common for the whole file but keep it like this for the future
+                ped_mean_charge = np.append(ped_mean_charge, [[event.index.obs_id, event.index.event_id, image_processor.clean.nsb_level]], axis=0)
+
             #set proper charge info according to time bins of pedestal events
             if reclean and (len(dl1_charges) > 0):
                 for [start_time, n, Qped, sig_Qped, meanQ] in reversed(dl1_charges):
@@ -348,7 +368,6 @@ def main():
                 image_processor.clean.nsb_level = meanQ
                 image_processor.clean.config = config['ImageProcessor'][cleaner]
                 ped_mean_charge = np.append(ped_mean_charge, [[event.index.obs_id, event.index.event_id, meanQ]], axis=0)
-                processing_info.frac_rised += image_processor.clean.frac_rised
 
             r1_dl1_calibrator(event) # r1->dl1a (images, peak times)                
 
@@ -365,6 +384,9 @@ def main():
                     )
 
             image_processor(event) # dl1a->dl1b (hillas parameters)
+
+            if (cleaner == 'ImageCleanerSST') and not ismc:
+                processing_info.frac_rised += image_processor.clean.frac_rised
 
             ## Fill monitoring container with baseline info :
             if not source.is_simulation:
@@ -401,7 +423,7 @@ def main():
                             containers=[event.mon.tel[tel].pedestal],
                         )
 
-                        
+
 
             # Extraction of pixel charge distribution for MC-data tuning
             if pixel_charges:
@@ -444,7 +466,7 @@ def main():
             # It cannot be done at this level, because: AttributeError: 'CameraHillasParametersContainer' object has no attribute 'disp'
 
             shower_processor(event) # dl1b->dl2 (reconstruction of stereo parameters, also energy/direction/classification in the future versions of ctapipe)
-            
+
             # Counting all triggered events
             processing_info.count_triggered(event, ismc=source.is_simulation)
 
@@ -465,12 +487,8 @@ def main():
             
             if not source.is_simulation:
                 I0 = event.dl1.tel[tel].parameters.hillas.intensity
-                if config['NsbCalibrator']['apply_global_Vdrop_correction']:
-                    VI = VAR_to_Idrop(np.median(pedestal_info.get_charge_std()**2),
-                                       tel)
-                    I_corr = I0/VI*config['NsbCalibrator']["intensity_correction"][tel_string]
-                else:
-                    I_corr = I0*config['NsbCalibrator']["intensity_correction"][tel_string]
+                # VN: to be consistent during the cleaning I had to move all gain drop corrections into calibration
+                I_corr = I0*config['NsbCalibrator']["intensity_correction"][tel_string]
                 event.dl1.tel[tel].parameters.hillas.intensity = I_corr
             else:
                 for tel in event.trigger.tels_with_trigger:
@@ -490,7 +508,7 @@ def main():
     # - some more parameters are extracted from other tables in the file and added to the parameters table for convenience
     # NOTE: unfortunately using this, units in all columns have to be dropped, because otherwise ctapipe merging tool fails.
     # I didn't find a solution, this should definitely be revisited!
-    if reclean and (len(dl1_charges) > 0):
+    if (reclean and (len(dl1_charges) > 0)) or pedestal_info.pedestals_in_file:
         write_extra_parameters(processing_info.output_file, config=config, ismc=ismc, meanQ=ped_mean_charge)
     else:
         write_extra_parameters(processing_info.output_file, config=config, ismc=ismc)
@@ -517,10 +535,10 @@ def main():
 
     # Logging all event counts
     processing_info.log_result_counts(ismc=source.is_simulation)
-    
-    if reclean and (len(dl1_charges) > 0):
+
+    if (reclean and (len(dl1_charges) > 0)) or pedestal_info.pedestals_in_file:
         logging.info('Average (per event) fraction of pixels (N/1296) with raised picture threshold: %f', processing_info.frac_rised/i)
-        
+
     if source.is_simulation:
         # Cut on minimum mc_energy in the output file, which is needed if we want to safely combine MC from different productions
         # NOTE: This doesn't change the mc and histogram tab in the output files and this must be taken care of in performance
