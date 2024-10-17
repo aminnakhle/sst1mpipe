@@ -277,10 +277,15 @@ class Calibrator_R0_R1:
         r0data = event.sst1m.r0.tel[self.telescope]
         baseline_subtracted = (r0data.adc_samples.T - r0data.digicam_baseline)
 
-        ## Apply (or not) pixel wise Voltage drop correction
+        ## Apply (or not) pixel wise Voltage drop correction, VN: now also global
         ## TODO ?? TOTEST
-        if self.config['NsbCalibrator']['apply_pixelwise_Vdrop_correction']:
-            VI = VAR_to_Idrop(pedestal_info.get_charge_std()**2, self.telescope)
+        if pedestal_info is not None:
+            if self.config['NsbCalibrator']['apply_pixelwise_Vdrop_correction']:
+                VI = VAR_to_Idrop(pedestal_info.get_charge_std()**2, self.telescope)
+            elif self.config['NsbCalibrator']['apply_global_Vdrop_correction']:
+                VI = VAR_to_Idrop(np.median(pedestal_info.get_charge_std()**2), self.telescope)
+            else:
+                VI = 1.0
         else:
             VI = 1.0
 
