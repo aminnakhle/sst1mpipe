@@ -411,7 +411,7 @@ def main():
                     # Arbitrary cut, just to prevent too big showers from being used
                     # We also take only every x-th event to gain some cputime
                     if (sum(clenaning_mask) < 20) and not bool(i % 10):
-                        pedestal_info.add_ped_evt(event, cleaning_mask=clenaning_mask)
+                        pedestal_info.add_ped_evt(event, cleaning_mask=clenaning_mask, store_image=False)
 
                     # writing pedestal info in dl1
                     if ( (pedestal_info.processed_pedestals !=0) and \
@@ -538,6 +538,8 @@ def main():
 
     if (reclean and (len(dl1_charges) > 0)) or pedestal_info.pedestals_in_file:
         logging.info('Average (per event) fraction of pixels (N/1296) with raised picture threshold: %f', processing_info.frac_rised/i)
+        # to dump how many times particular pixels were raised
+        #image_processor.clean.dump()
 
     if source.is_simulation:
         # Cut on minimum mc_energy in the output file, which is needed if we want to safely combine MC from different productions

@@ -17,16 +17,21 @@ from sst1mpipe.utils import (
 )
 
 import logging
+from collections import deque
+from statistics import mean
 
 MON_EVT_TYPE = 8
 class sliding_pedestals:
-    def __init__(self, input_file=None, max_array_size = 100, config=None):
+    def __init__(self, input_file=None, max_array_size = 100, max_images_array = 1000, config=None):
 
-        self.timestamps = np.array([])
-        self.ped_mean_array  = np.array([])
-        self.ped_std_array   = np.array([])
-        self.ped_img_array   = np.array([])
-        self.max_array_size = max_array_size
+        self.timestamps = deque([])
+        self.ped_mean_array   = deque([])
+        self.ped_std_array    = deque([])
+        self.ped_img_array    = deque([])
+        self.max_array_size   = max_array_size
+        self.max_images_array = max_images_array
+        self.ped_img_sum      = None
+        self.ped_img_sum2     = None
         self.processed_pedestals = 0
         self.config = config
         self.input_file = input_file
@@ -50,34 +55,39 @@ class sliding_pedestals:
         if store_image:
             image = evt.dl1.tel[tel].image
         else:
-            image = np.zeros(pedestal.shape[0])
+            image = np.zeros(pedestal.shape[0], dtype=np.float64)
         self.processed_pedestals = self.processed_pedestals + 1
         if cleaning_mask is not None:
             pedestal[cleaning_mask] = -100 * np.ones(pedestal.shape[1])
             image[cleaning_mask] = -100
         timestamp = evt.sst1m.r0.tel[tel].local_camera_clock/1e9
 
-        if self.timestamps.shape[0] == 0:
-            self.ped_mean_array = np.array([pedestal.mean(axis=1)])
-            self.ped_std_array  = np.array([pedestal.std(axis=1)])
-            self.ped_img_array  = np.array([image])
-            self.timestamps     = np.array([timestamp])
+        self.ped_img_array.append(image)
+        if self.ped_img_sum is None:
+            self.ped_img_sum = image
+            self.ped_img_sum2 = image**2
         else:
-            self.ped_mean_array = np.vstack((self.ped_mean_array, [pedestal.mean(axis=1)]))
-            self.ped_std_array  = np.vstack((self.ped_std_array,  [pedestal.std(axis=1)]))
-            self.ped_img_array  = np.vstack((self.ped_img_array, [image]))
-            self.timestamps     = np.append(self.timestamps,timestamp)
-        if self.timestamps.shape[0] > self.max_array_size:
-            self.ped_mean_array = self.ped_mean_array[1:]
-            self.ped_std_array  = self.ped_std_array[1:]
-            self.ped_img_array  = self.ped_img_array[1:]
-            self.timestamps     = self.timestamps[1:]
+            self.ped_img_sum += image
+            self.ped_img_sum2 += image**2
+
+        if len(self.ped_img_array) > self.max_images_array:
+            self.ped_img_sum -= self.ped_img_array[0]
+            self.ped_img_sum2 -= self.ped_img_array[0]**2
+            self.ped_img_array.popleft()
+
+        self.ped_mean_array.append(pedestal.mean(axis=1))
+        self.ped_std_array.append(pedestal.std(axis=1))
+        self.timestamps.append(timestamp)
+        if len(self.timestamps) > self.max_array_size:
+            self.ped_mean_array.popleft()
+            self.ped_std_array.popleft()
+            self.timestamps.popleft()
 
     def get_n_events(self):
-        return self.timestamps.shape[0]
+        return len(self.timestamps)
 
     def get_mean_ts(self):
-        return self.timestamps.mean() *u.s
+        return mean(self.timestamps) *u.s
 
     def get_min_ts(self):
         return self.timestamps[0] *u.s
@@ -86,25 +96,25 @@ class sliding_pedestals:
         return self.timestamps[-1] *u.s
 
     def get_charge_mean(self):
-        pedarray = self.ped_mean_array
+        pedarray = np.array(self.ped_mean_array)
         masked = np.ma.masked_values(pedarray, -100)
         return masked.mean(axis=0).data
 
     def get_charge_median(self):
-        pedarray = self.ped_mean_array
+        pedarray = np.array(self.ped_mean_array)
         masked = np.ma.masked_values(pedarray, -100)
         return np.median(masked.data,axis=0)
 
     def get_charge_std(self):
-        pedarray = self.ped_std_array
+        pedarray = np.array(self.ped_std_array)
         masked = np.ma.masked_values(pedarray, 0)
         return masked.data.mean(axis=0)
 
     def get_img_charge_mean(self):
-        return np.mean(self.ped_img_array, axis=0)
+        return np.array(self.ped_img_sum, dtype=np.float64)/len(self.ped_img_array)
 
     def get_img_charge_std(self):
-        return np.std(self.ped_img_array, axis=0)
+        return np.sqrt(np.array(self.ped_img_sum2, dtype=np.float64)/len(self.ped_img_array) - (np.array(self.ped_img_sum, dtype=np.float64)/len(self.ped_img_array))**2)
 
     def fill_mon_container(self, evt):
         tel = evt.sst1m.r0.tels_with_data[0]
@@ -118,7 +128,7 @@ class sliding_pedestals:
         mon_container.charge_std      = self.get_charge_std()
         return
 
-    def load_firsts_pedestals(self,max_n_ped=50,max_evt=1000):
+    def load_firsts_pedestals(self,max_n_ped=100,max_n_img=1000,max_evt=100000):
         """
         Reads first max_n_ped pedestal events in the buffer.
         """
@@ -135,13 +145,15 @@ class sliding_pedestals:
             if r0data._camera_event_type.value == MON_EVT_TYPE:
                 self.add_ped_evt(event, store_image=False)
 
-            if self.timestamps.shape[0] >= max_n_ped:
+            if len(self.timestamps) >= max_n_ped:
                 break
 
         data_stream._subarray = get_subarray()
         r1_dl1_calibrator = CameraCalibrator(subarray=data_stream.subarray, config=self.config)
 
         # to treat images we need to estimate gain drop from pedestals, so redo pedestals once more...
+        keep_size = self.max_array_size
+        self.max_array_size = self.max_images_array
         for jj,event in enumerate(data_stream):
 
             if jj == 0:
@@ -170,16 +182,22 @@ class sliding_pedestals:
                     swap_flag=swap_modules
                     )
 
-                self.ped_mean_array = self.ped_mean_array[1:]
-                self.ped_std_array  = self.ped_std_array[1:]
-                self.ped_img_array  = self.ped_img_array[1:]
-                self.timestamps     = self.timestamps[1:]
+                if jj <= ii:
+                    self.ped_mean_array.popleft()
+                    self.ped_std_array.popleft()
+                    self.timestamps.popleft()
+                    self.ped_img_array.popleft()
 
                 self.add_ped_evt(event)
 
-            if jj == ii:
-                break
+                if len(self.ped_img_array) >= max_n_img:
+                    break
 
+        self.max_array_size = keep_size
+        for i in range(len(self.timestamps)-keep_size):
+            self.ped_mean_array.pop()
+            self.ped_std_array.pop()
+            self.timestamps.pop()
 
     def load_firsts_fake_pedestals(self, max_evt=10):
         """
@@ -214,6 +232,8 @@ class sliding_pedestals:
                 self.add_ped_evt(event, cleaning_mask=clenaning_mask, store_image=False)
 
         # to treat images we need to estimate gain drop from pedestals, so redo pedestals once more...
+        keep_size = self.max_array_size
+        self.max_array_size = self.max_images_array
         for jj,event in enumerate(source):
 
             if jj == 0:
@@ -242,15 +262,23 @@ class sliding_pedestals:
                   swap_flag=swap_modules
                   )
 
-              self.ped_mean_array = self.ped_mean_array[1:]
-              self.ped_std_array  = self.ped_std_array[1:]
-              self.ped_img_array  = self.ped_img_array[1:]
-              self.timestamps     = self.timestamps[1:]
+              if jj <= ii:
+                  self.ped_mean_array.popleft()
+                  self.ped_std_array.popleft()
+                  self.timestamps.popleft()
+                  self.ped_img_array.popleft()
 
               self.add_ped_evt(event)
 
-            if jj == ii:
-                break
+              if len(self.ped_img_array) >= max_n_img:
+                  break
+
+        self.max_array_size = keep_size
+        for i in range(len(self.timestamps)-keep_size):
+            self.ped_mean_array.pop()
+            self.ped_std_array.pop()
+            self.timestamps.pop()
+
 
     def log_pedestal_settings(self):
 
