@@ -111,10 +111,10 @@ class sliding_pedestals:
         return masked.data.mean(axis=0)
 
     def get_img_charge_mean(self):
-        return np.array(self.ped_img_sum, dtype=np.float64)/len(self.ped_img_array)
+        return self.ped_img_sum/len(self.ped_img_array)
 
     def get_img_charge_std(self):
-        return np.sqrt(np.array(self.ped_img_sum2, dtype=np.float64)/len(self.ped_img_array) - (np.array(self.ped_img_sum, dtype=np.float64)/len(self.ped_img_array))**2)
+        return np.sqrt(self.ped_img_sum2/len(self.ped_img_array) - (self.ped_img_sum/len(self.ped_img_array))**2)
 
     def fill_mon_container(self, evt):
         tel = evt.sst1m.r0.tels_with_data[0]
