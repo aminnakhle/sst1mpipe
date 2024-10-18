@@ -20,7 +20,7 @@ from ctapipe.containers import (
 from copy import deepcopy
 
 import numpy as np
-
+import logging
 
 def get_only_main_island_mask(geom, cleaning_mask):
             
@@ -49,6 +49,7 @@ class ImageCleanerSST(ImageCleaner):
     nsb_level = 0
     config = 0
     frac_rised = 0
+    raised = np.zeros(1296)
 
     def __call__(
         self, tel_id: int, image: np.ndarray, arrival_times=None
@@ -76,6 +77,7 @@ class ImageCleanerSST(ImageCleaner):
         geom = self.subarray.tel[tel_id].camera.geometry
         try:
             self.frac_rised = sum(pic_thr > picture_threshold_pe)/float(len(pic_thr))
+            self.raised += pic_thr > picture_threshold_pe
         except:
             self.frac_rised = 0.0
 
@@ -100,6 +102,11 @@ class ImageCleanerSST(ImageCleaner):
             return get_only_main_island_mask(geom, time_delta_cleaning_mask)
         else:
             return time_delta_cleaning_mask
+
+    # for testing, might disappear in the future
+    def dump(self):
+        for ii,r in enumerate(self.raised):
+            logging.info("pixel %i raised %i times",ii,r)
 
 
 class ImageCleanerSST_MC(ImageCleaner):
