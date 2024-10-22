@@ -210,6 +210,30 @@ def saturated_charge_correction(event, processing_info=None):
     return event
 
 
+def correct_MC_for_PDE_drop(event, config=None):
+    """
+    Performs correction of the MC signal for the PDE (QE) drop.
+    Beware of using right correction values in the config file - this is MC-config dependent
+
+    Parameters
+    ----------
+    event:
+        sst1mpipe.io.containers.SST1MArrayEventContainer
+
+    config: dict
+    Returns
+    -------
+    event:
+        sst1mpipe.io.containers.SST1MArrayEventContainer
+
+    """
+    for tel in event.r1.tel:
+        VI = config['NsbCalibrator']['MC_correction_for_PDE'][get_tel_string(tel, mc=True)]
+        event.r1.tel[tel].waveform /= VI
+
+    return event
+
+
 class Calibrator_R0_R1:
 
     """

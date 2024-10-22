@@ -62,6 +62,10 @@
       "intensity_correction": {
         "tel_001": 1.0,
         "tel_002": 1.0
+      },
+      "MC_correction_for_PDE": {
+        "tel_001": 0.9393873691700036,
+        "tel_002": 0.9819055121768047
       }
   },
 
