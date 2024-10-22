@@ -57,7 +57,8 @@ from sst1mpipe.calib import (
     window_transmittance_correction,
     get_window_corr_factors,
     saturated_charge_correction,
-    Calibrator_R0_R1
+    Calibrator_R0_R1,
+    correct_MC_for_PDE_drop
 )
 
 from ctapipe.io import EventSource
@@ -299,13 +300,14 @@ def main():
                     tel_string = get_tel_string(tel, mc=False)
                     location = get_location(config=config, tel=tel_string)
                     swap_modules = get_swap_flag(event)
-                    charge_to_nsb = config['mean_charge_to_nsb_rate'][tel_string]
-                    for setting in charge_to_nsb:
-                        min_charge = setting['mean_charge_bin_low']
-                        nsb_rate = setting['nsb_rate']
-                        if image_processor.clean.nsb_level >= min_charge:
-                            break
-                    logging.info('Average charge from the first batch of pedestal events is %f which corresponds to NSB level %s in %s', image_processor.clean.nsb_level, nsb_rate, tel_string)
+                    if (cleaner == 'ImageCleanerSST'):
+                        charge_to_nsb = config['mean_charge_to_nsb_rate'][tel_string]
+                        for setting in charge_to_nsb:
+                            min_charge = setting['mean_charge_bin_low']
+                            nsb_rate = setting['nsb_rate']
+                            if image_processor.clean.nsb_level >= min_charge:
+                                break
+                        logging.info('Average charge from the first batch of pedestal events is %f which corresponds to NSB level %s in %s', image_processor.clean.nsb_level, nsb_rate, tel_string)
 
                 event.trigger.tels_with_trigger = [tel]
 
@@ -345,13 +347,15 @@ def main():
             # and simulation histogram is not saved. Here we repace it with an array of zeros.
             if source.is_simulation:
                 event = correct_true_image(event)
+                # Now include PDE correction based on the PDE drop set in MC
+                event = correct_MC_for_PDE_drop(event, config=config)
 
             # This function flags the bad pixel according to the cfg file, and just for sure also kills the waveforms.
             # Charges in these pixels are then interpolated using method set in cfg: invalid_pixel_handler_type
             # Default is NeighborAverage, but can be turned off with 'null'
             event = remove_bad_pixels(event, config=config)
 
-            if (not reclean) and pedestal_info.pedestals_in_file:
+            if (not source.is_simulation) and (not reclean) and pedestal_info.pedestals_in_file:
                 # ALWAYS use adaptive cleaning - take data from online pedestal_info
                 image_processor.clean.average_charge = pedestal_info.get_img_charge_mean()
                 image_processor.clean.stdev_charge = pedestal_info.get_img_charge_std()
@@ -508,7 +512,7 @@ def main():
     # - some more parameters are extracted from other tables in the file and added to the parameters table for convenience
     # NOTE: unfortunately using this, units in all columns have to be dropped, because otherwise ctapipe merging tool fails.
     # I didn't find a solution, this should definitely be revisited!
-    if (reclean and (len(dl1_charges) > 0)) or pedestal_info.pedestals_in_file:
+    if (not source.is_simulation) and ((reclean and (len(dl1_charges) > 0)) or pedestal_info.pedestals_in_file):
         write_extra_parameters(processing_info.output_file, config=config, ismc=ismc, meanQ=ped_mean_charge)
     else:
         write_extra_parameters(processing_info.output_file, config=config, ismc=ismc)
@@ -536,7 +540,7 @@ def main():
     # Logging all event counts
     processing_info.log_result_counts(ismc=source.is_simulation)
 
-    if (reclean and (len(dl1_charges) > 0)) or pedestal_info.pedestals_in_file:
+    if (not source.is_simulation) and ((reclean and (len(dl1_charges) > 0)) or pedestal_info.pedestals_in_file):
         logging.info('Average (per event) fraction of pixels (N/1296) with raised picture threshold: %f', processing_info.frac_rised/i)
         # to dump how many times particular pixels were raised
         #image_processor.clean.dump()
