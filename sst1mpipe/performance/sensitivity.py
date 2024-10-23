@@ -36,6 +36,7 @@ from sst1mpipe.utils import (
     correct_number_simulated_showers,
     mc_correct_shower_reuse,
     check_same_shower_fraction,
+    stereo_delta_disp_cut
 )
 
 from .spectra import *
@@ -761,6 +762,10 @@ def sensitivity(
 
     dl2_gamma = load_dl2_sst1m(input_file_gamma, tel=telescope, config=config, table='astropy')
     dl2_proton = load_dl2_sst1m(input_file_proton, tel=telescope, config=config, table='astropy')
+
+    if telescope == 'stereo':
+        dl2_gamma = stereo_delta_disp_cut(dl2_gamma, config=config)
+        dl2_proton = stereo_delta_disp_cut(dl2_proton, config=config)
 
     mc_info_gamma = get_mc_info(input_file_gamma, config=config)
     mc_info_proton = get_mc_info(input_file_proton, config=config)
