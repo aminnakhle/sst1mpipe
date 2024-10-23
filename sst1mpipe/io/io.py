@@ -30,7 +30,8 @@ from sst1mpipe.utils import (
     add_event_id,
     get_tel_string,
     get_finite,
-    get_pointing_radec
+    get_pointing_radec,
+    stereo_delta_disp_cut
 )
 
 from astropy.io import fits
@@ -1301,6 +1302,8 @@ def load_more_dl2_files(files, config=None, gammaness_cut=None):
                     logging.info('N of events after gammaness cut: {}'.format(len(df)))
             else:
                 df = df0
+            if tel_setup == 'stereo':
+                df = stereo_delta_disp_cut(df, config=config)
 
             ## adding pipeline info
             df['RF_used'] = RF_used
