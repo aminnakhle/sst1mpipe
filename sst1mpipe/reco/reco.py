@@ -21,13 +21,16 @@ from sst1mpipe.utils import (
     get_wr_timestamp,
     get_stereo_method,
     get_horizon_frame,
-    get_finite
+    get_finite,
+    get_tel_string
 )
 from sst1mpipe.io import (
     load_more_dl1_tables_mono,
     load_dl1_sst1m,
     check_outdir,
-    get_dl1_info
+    get_dl1_info,
+    load_dl1_pedestals,
+    write_dl1_pedestals
 )
 from sst1mpipe.analysis import add_reco_ra_dec
 
@@ -1222,3 +1225,14 @@ def make_dl1_stereo(
     logging.info(f"Multiple coincidences: {multiple_coincidences}")
     logging.info(f"TEL {tel_1} mono events: {mono_events}")
     source.close()
+
+    # Propagate tel1 pedestals
+    # NOTE: We propagate only tel1 pedestals
+    # Both could be stored, but I am afraid that /pedestal/tel_XX
+    # table is not compatible with ctapipe readers
+    logging.info('Propagating pedestals from mono tel1 DL1 to stereo DL1..')
+    try:
+        pedestals = load_dl1_pedestals(dl1_file_tel1)
+        write_dl1_pedestals(output_path, pedestal_table=pedestals)
+    except:
+        logging.warning('No pedestals found in tel1 DL1 file!')
