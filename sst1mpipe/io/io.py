@@ -907,6 +907,31 @@ def load_dl1_pedestals(input_file):
     return pedestals
 
 
+def write_dl1_pedestals(input_file, pedestal_table=None):
+
+    """
+    Write table of pedestal events from DL1 file into 
+    another DL1 file. Typical usecase is to propagate 
+    pedestals from mono DL1 to stereo DL1.
+
+    Parameters
+    ----------
+    input_file: string
+        Path
+    
+    pedestal_table: astropy.table.Table
+
+    """
+
+    try:
+        write_table_hdf5(pedestal_table, input_file, 
+            append=True, path='/dl1/monitoring/telescope/pedestal', 
+            serialize_meta=False
+            )
+    except:
+        logging.warning('Writing pedestals into the file failed!')
+
+
 def load_extra_table(input_file, key=None, remove_column=None):
 
     table = read_table(input_file, key)
