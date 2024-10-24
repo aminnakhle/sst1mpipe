@@ -236,7 +236,7 @@ def load_data(files, logs, config=None, tel=None, data_level='dl1'):
             continue
         try:
             pt = load_dl1_pedestals(input_file)
-            if ('1' in tel) or (): cs=21
+            if '1' in tel: cs=21
             else: cs=22
             NSB = VAR_to_NSB(pt['pedestal_charge_std'].mean(axis=1)**2, cs)
             nsb.append(NSB.mean())
