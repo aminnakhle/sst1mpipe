@@ -1223,7 +1223,8 @@ def stereo_delta_disp_cut(data, config=None):
         mask = data['min_distance']*180/np.pi < config['analysis']['stereo_delta_disp_cut_deg']
         logging.info('{} deg cut on min disp distance applied.'.format(config['analysis']['stereo_delta_disp_cut_deg']))
         logging.info('N of events of stereo after delta disp cut: {} '.format(sum(mask)))
-        return data[mask]
+        data_selected = data[mask].copy()
+        return data_selected
     else:
         logging.info('No cut on min disp distance applied.')
         return data
@@ -1870,4 +1871,3 @@ def plot_livetime(hdu_dir,objects=None,ignore_sources=[]):
     plt.ylabel('observation time [h]')
     plt.xticks(rotation=45)
     return f,ax
-

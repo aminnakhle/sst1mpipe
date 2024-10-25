@@ -50,7 +50,9 @@ from sst1mpipe.io import (
     read_charge_images,
     write_wr_timestamps,
     write_charge_fraction,
-    write_dl1_info
+    write_dl1_info,
+    get_used_qe_simtel,
+    get_pde_correction_factors
 )
 
 from sst1mpipe.calib import (
@@ -211,6 +213,12 @@ def main():
         logging.info("Tel 1 Intensity correction factor: {}".format(config['NsbCalibrator']['intensity_correction']['tel_001']))
         logging.info("Tel 2 Intensity correction factor: {}".format(config['NsbCalibrator']['intensity_correction']['tel_002']))
 
+        if config['NsbCalibrator']['MC_correction_for_PDE']:
+            used_qe = get_used_qe_simtel(source)
+            logging.info("QE files used in the MC production (including the default ones): {}".format(' '.join(map(str, used_qe))))
+            pde_corr_factors = get_pde_correction_factors()
+            logging.info("PDE correction factors found in the calibration file mc_pde_correction_factors.json: %s", pde_corr_factors)
+
     else:
         source = SST1MEventSource([processing_info.input_file], max_events=max_events)
         source._subarray = get_subarray()
@@ -230,6 +238,7 @@ def main():
             logging.info('Using arrayEvtNum as event_id: input file contains SWAT array event IDs')
         else:
             logging.info('Using eventNumber as event_id: input file does not contain SWAT array event IDs')
+    
 
     if reclean:
         processing_info.output_file = os.path.join(outdir, processing_info.output_file.split('/')[-1].rstrip(".h5") + "_recleaned.h5")
@@ -348,7 +357,11 @@ def main():
             if source.is_simulation:
                 event = correct_true_image(event)
                 # Now include PDE correction based on the PDE drop set in MC
-                event = correct_MC_for_PDE_drop(event, config=config)
+                if config['NsbCalibrator']['MC_correction_for_PDE']:
+                    event = correct_MC_for_PDE_drop(event, 
+                        simtel_config_qe=used_qe,
+                        pde_corr_factors=pde_corr_factors
+                        )
 
             # This function flags the bad pixel according to the cfg file, and just for sure also kills the waveforms.
             # Charges in these pixels are then interpolated using method set in cfg: invalid_pixel_handler_type

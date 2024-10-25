@@ -8,7 +8,6 @@ from sst1mpipe.utils import (
     VAR_to_Idrop
     )
 
-
 def get_default_window(telescope=None):
     """
     Provides default window transmissivity file, 
@@ -210,26 +209,39 @@ def saturated_charge_correction(event, processing_info=None):
     return event
 
 
-def correct_MC_for_PDE_drop(event, config=None):
+def correct_MC_for_PDE_drop(event, simtel_config_qe=None, pde_corr_factors=None):
     """
     Performs correction of the MC signal for the PDE (QE) drop.
-    Beware of using right correction values in the config file - this is MC-config dependent
 
     Parameters
     ----------
     event:
         sst1mpipe.io.containers.SST1MArrayEventContainer
 
-    config: dict
+    simtel_config_qe: numpy.array
+        Different PDEs (QEs) found in the simtel file header
+
+    pde_corr_factors: dict
+        Correction factors for different MC productions (it is NSB dependent) 
+        stored in ../data/mc_pde_correction_factors.json
+
     Returns
     -------
     event:
         sst1mpipe.io.containers.SST1MArrayEventContainer
 
     """
+
     for tel in event.r1.tel:
-        VI = config['NsbCalibrator']['MC_correction_for_PDE'][get_tel_string(tel, mc=True)]
-        event.r1.tel[tel].waveform /= VI
+
+        try:
+            stored_qe = pde_corr_factors['MC_correction_for_PDE'][get_tel_string(tel, mc=True)].keys()
+            mask = [i in simtel_config_qe for i in stored_qe]
+            VI = pde_corr_factors['MC_correction_for_PDE'][get_tel_string(tel, mc=True)][np.array(list(stored_qe))[mask][0]]
+            event.r1.tel[tel].waveform /= VI
+        except:
+            logging.error('PDE correction factors in the calibration file were not found in the simtel file header. Are you sure that you have listed the correct PDE factor in the mc_pde_correction_factors.json file?')
+            exit()
 
     return event
 
