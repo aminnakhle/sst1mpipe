@@ -831,7 +831,7 @@ class irf_maker:
 
         if isfloat(self.gammaness_cut):
             logging.info('Global gammaness cut {} applied.'.format(self.gammaness_cut))
-            dl2_selected = dl2_data[(dl2_data['gammaness']>self.gammaness_cut)]
+            mask_gg = dl2_data['gammaness'] > self.gammaness_cut
         else:
             logging.info('Energy dependent gammaness cut applied.')
 
@@ -841,7 +841,10 @@ class irf_maker:
                 self.gammaness_cut,
                 operator.ge,
             )
-            dl2_selected = dl2_data[mask_gg].copy()
+        dl2_selected = dl2_data[mask_gg].copy()
+
+        # cut on delta disp
+        dl2_selected = stereo_delta_disp_cut(dl2_selected, config=self.config)
 
         # event selection is performed authomaticaly, if you provide load_dl2_sst1m with a config file
         # dl2_selected = event_selection(dl2_selected, config=self.config)

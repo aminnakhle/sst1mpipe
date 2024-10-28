@@ -32,5 +32,7 @@ from .io import (
     load_more_dl2_files,
     load_source_catalog,
     load_distributions_sst1m,
-    write_dl1_pedestals
+    write_dl1_pedestals,
+    get_used_qe_simtel,
+    get_pde_correction_factors
 )
