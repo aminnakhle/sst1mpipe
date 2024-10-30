@@ -1,12 +1,12 @@
 {
   "MC_correction_for_PDE": {
     "tel_001": {
-      "qe_SST1M_5477_ave_TEL1_NSB136.0": 0.9393873691700036,
-      "qe_SST1M_5477_ave_TEL1_NSB251.0": 0.9
+      "qe_SST1M_5477_ave_TEL1_NSB136.0": 0.9656945022506267,
+      "qe_SST1M_5477_ave_TEL1_NSB251.0": 0.9393873691700036
     },
     "tel_002": {
-      "qe_SST1M_5477_ave_TEL2_NSB177.0": 0.9819055121768047,
-      "qe_SST1M_5477_ave_TEL2_NSB300.0": 0.9
+      "qe_SST1M_5477_ave_TEL2_NSB177.0": 0.9891814057303215,
+      "qe_SST1M_5477_ave_TEL2_NSB300.0": 0.9819055121768047
     }
   }
 }
