@@ -235,7 +235,7 @@ def make_DQ_table(tel_setup,
 
 
         for ii,filename in enumerate(file_list):
-            int_hist = read_table(filename,'intensity_hist_{}'.format(tel))
+            int_hist = read_table(filename,'intensity_hist')
             zenith   = read_table(filename,'zenith')[0][0]
             obs_id   = filename.split('_')[-1].split('.')[0]
             try:
