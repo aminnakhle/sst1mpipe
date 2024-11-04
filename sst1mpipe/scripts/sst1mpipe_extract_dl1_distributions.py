@@ -123,63 +123,63 @@ def main():
         if len(tels)> 0:
             break
 
-    tel = tels[0]
-    dl1_data, ped_fractions, recleaned_fractions, times, nsb = load_data(files, logs, config=None, tel=tel, data_level='dl1')
+    for tel in tels:
+        dl1_data, ped_fractions, recleaned_fractions, times, nsb = load_data(files, logs, config=None, tel=tel, data_level='dl1')
 
-    # iterate over obsids for given date and split data
-    for obsid in obsids_date:
+        # iterate over obsids for given date and split data
+        for obsid in obsids_date:
+            
+            row_mask = obsids == obsid
+            tmin = data_store.obs_table[row_mask]['TSTART']
+            tmax = data_store.obs_table[row_mask]['TSTOP']
+            
+            time_mask = (dl1_data['local_time'] > tmin.value[0]) & (dl1_data['local_time'] <= tmax.value[0])
+            time_mask_ped = (times > tmin.value[0]) & (times <= tmax.value[0])
         
-        row_mask = obsids == obsid
-        tmin = data_store.obs_table[row_mask]['TSTART']
-        tmax = data_store.obs_table[row_mask]['TSTOP']
+            # get intensity distribution per obsid (wobble)
+            
+            data, bin_edges = np.histogram(dl1_data[time_mask].camera_frame_hillas_intensity, bins=bins)
+            zenith = 90.-np.mean(dl1_data[time_mask].true_alt_tel)
+            
+            # elapsed time: sum of the time differences, excluding large ones
+            time_diff = dl1_data[time_mask].local_time.diff()
+            t_elapsed = np.sum(time_diff[time_diff < 10.]) * u.s
+            timestamp = np.mean(dl1_data[time_mask].local_time)
+
+            ped_fraction_mean = np.mean(ped_fractions[time_mask_ped])
+            recleaned_fraction_mean = np.mean(recleaned_fractions[time_mask_ped])
+            nsb_per_dl3 = np.mean(nsb[time_mask_ped])
         
-        time_mask = (dl1_data['local_time'] > tmin.value[0]) & (dl1_data['local_time'] <= tmax.value[0])
-        time_mask_ped = (times > tmin.value[0]) & (times <= tmax.value[0])
-    
-        # get intensity distribution per obsid (wobble)
-        
-        data, bin_edges = np.histogram(dl1_data[time_mask].camera_frame_hillas_intensity, bins=bins)
-        zenith = 90.-np.mean(dl1_data[time_mask].true_alt_tel)
-        
-        # elapsed time: sum of the time differences, excluding large ones
-        time_diff = dl1_data[time_mask].local_time.diff()
-        t_elapsed = np.sum(time_diff[time_diff < 10.]) * u.s
-        timestamp = np.mean(dl1_data[time_mask].local_time)
+            rate = data / t_elapsed
+            differential_rate = rate / bins_width
 
-        ped_fraction_mean = np.mean(ped_fractions[time_mask_ped])
-        recleaned_fraction_mean = np.mean(recleaned_fractions[time_mask_ped])
-        nsb_per_dl3 = np.mean(nsb[time_mask_ped])
-    
-        rate = data / t_elapsed
-        differential_rate = rate / bins_width
+            print('Integration time for obsid {}: {}'.format(obsid, t_elapsed.to(u.hour)))
 
-        print('Integration time for obsid {}: {}'.format(obsid, t_elapsed.to(u.hour)))
+            t_table = QTable()
+            t_table['t_elapsed'] = np.array([t_elapsed.to(u.hour).value])
+            z_table = QTable()
+            z_table['zenith'] = np.array([zenith])
+            tt_table = QTable()
+            tt_table['timestamp'] = np.array([timestamp])
+            ped_table = QTable()
+            ped_table['survived_pedestal_frac'] = np.array([ped_fraction_mean])
+            rec_table = QTable()
+            rec_table['recleaned_fraction'] = np.array([recleaned_fraction_mean])
+            nsb_table = QTable()
+            nsb_table['NSB'] = np.array([nsb_per_dl3])
 
-        t_table = QTable()
-        t_table['t_elapsed'] = np.array([t_elapsed.to(u.hour).value])
-        z_table = QTable()
-        z_table['zenith'] = np.array([zenith])
-        tt_table = QTable()
-        tt_table['timestamp'] = np.array([timestamp])
-        ped_table = QTable()
-        ped_table['survived_pedestal_frac'] = np.array([ped_fraction_mean])
-        rec_table = QTable()
-        rec_table['recleaned_fraction'] = np.array([recleaned_fraction_mean])
-        nsb_table = QTable()
-        nsb_table['NSB'] = np.array([nsb_per_dl3])
+            # Save all to output tables
+            table = get_table(rate, differential_rate, bin_edges=bin_edges)
 
-        # Save all to output tables
-        table = get_table(rate, differential_rate, bin_edges=bin_edges)
-
-        check_outdir(outpath)
-        outfile = outpath + '/intensity_hist_'+str(int(obsid))+'.h5'
-        write_table_hdf5(table, outfile, path='intensity_hist', overwrite=True, append=True, serialize_meta=True)
-        write_table_hdf5(t_table, outfile, path='t_elapsed', overwrite=True, append=True, serialize_meta=True)
-        write_table_hdf5(z_table, outfile, path='zenith', overwrite=True, append=True, serialize_meta=True)
-        write_table_hdf5(tt_table, outfile, path='timestamp', overwrite=True, append=True, serialize_meta=True)
-        write_table_hdf5(ped_table, outfile, path='survived_pedestal_frac', overwrite=True, append=True, serialize_meta=True)
-        write_table_hdf5(rec_table, outfile, path='recleaned_fraction', overwrite=True, append=True, serialize_meta=True)
-        write_table_hdf5(nsb_table, outfile, path='NSB', overwrite=True, append=True, serialize_meta=True)
+            check_outdir(outpath)
+            outfile = outpath + '/intensity_hist_'+tel+'_'+str(int(obsid))+'.h5'
+            write_table_hdf5(table, outfile, path='intensity_hist', overwrite=True, append=True, serialize_meta=True)
+            write_table_hdf5(t_table, outfile, path='t_elapsed', overwrite=True, append=True, serialize_meta=True)
+            write_table_hdf5(z_table, outfile, path='zenith', overwrite=True, append=True, serialize_meta=True)
+            write_table_hdf5(tt_table, outfile, path='timestamp', overwrite=True, append=True, serialize_meta=True)
+            write_table_hdf5(ped_table, outfile, path='survived_pedestal_frac', overwrite=True, append=True, serialize_meta=True)
+            write_table_hdf5(rec_table, outfile, path='recleaned_fraction', overwrite=True, append=True, serialize_meta=True)
+            write_table_hdf5(nsb_table, outfile, path='NSB', overwrite=True, append=True, serialize_meta=True)
 
 def get_table(rate, diff_rate, bin_edges=None):
 
