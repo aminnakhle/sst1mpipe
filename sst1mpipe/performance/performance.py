@@ -770,6 +770,7 @@ class irf_maker:
         self.azimuth      = int(round(tel_az/10.)*10)
 
         # /data/... is mandatory scheme. if not used, the hdu indexer cannot merge photon lists with IRFs
+        # TODO: deal with the NSB bin
         self.outdir = output_dir + '/data/sst1m_{}/{}/bcf/ze{}_az{}_nsb100_gc{}/'.format(self.tel_setup,
                                                                     self.pipeline_version,
                                                                     self.zenith_angle,
@@ -841,7 +842,9 @@ class irf_maker:
                 self.gammaness_cut,
                 operator.ge,
             )
-        dl2_selected = dl2_data[mask_gg].copy()
+        # JJ: .copy() complains: ValueError: values whose keys begin with an uppercase char must be Config instances: 'MC_correction_for_PDE', True
+        # I changed the config param to lower case, let's see what happens in the next versions
+        dl2_selected = dl2_data[mask_gg] #.copy()
 
         # cut on delta disp
         dl2_selected = stereo_delta_disp_cut(dl2_selected, config=self.config)

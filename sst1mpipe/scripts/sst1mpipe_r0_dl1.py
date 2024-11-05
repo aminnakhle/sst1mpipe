@@ -213,7 +213,7 @@ def main():
         logging.info("Tel 1 Intensity correction factor: {}".format(config['NsbCalibrator']['intensity_correction']['tel_001']))
         logging.info("Tel 2 Intensity correction factor: {}".format(config['NsbCalibrator']['intensity_correction']['tel_002']))
 
-        if config['NsbCalibrator']['MC_correction_for_PDE']:
+        if config['NsbCalibrator']['mc_correction_for_PDE']:
             used_qe = get_used_qe_simtel(source)
             logging.info("QE files used in the MC production (including the default ones): {}".format(' '.join(map(str, used_qe))))
             pde_corr_factors = get_pde_correction_factors()
@@ -357,7 +357,7 @@ def main():
             if source.is_simulation:
                 event = correct_true_image(event)
                 # Now include PDE correction based on the PDE drop set in MC
-                if config['NsbCalibrator']['MC_correction_for_PDE']:
+                if config['NsbCalibrator']['mc_correction_for_PDE']:
                     event = correct_MC_for_PDE_drop(event, 
                         simtel_config_qe=used_qe,
                         pde_corr_factors=pde_corr_factors
