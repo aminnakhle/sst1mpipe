@@ -1,5 +1,5 @@
 {
-  "MC_correction_for_PDE": {
+  "mc_correction_for_PDE": {
     "tel_001": {
       "qe_SST1M_5477_ave_TEL1_NSB136.0": 0.9656945022506267,
       "qe_SST1M_5477_ave_TEL1_NSB251.0": 0.9393873691700036

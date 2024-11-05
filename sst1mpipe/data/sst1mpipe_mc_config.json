@@ -64,7 +64,7 @@
         "tel_001": 1.0,
         "tel_002": 1.0
       },
-      "MC_correction_for_PDE": true
+      "mc_correction_for_PDE": true
   },
 
     "ImageProcessor": {
