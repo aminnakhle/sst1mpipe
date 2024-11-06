@@ -593,7 +593,7 @@ def plot_angular_resolution(
 def plot_roc(
         roc_tables=None, labels=None, ax=None, 
         gammaness_cut=None, preliminary=False, 
-        linestyles=None):
+        linestyles=None, title='ROC curve'):
     """
     Plots energy resolution and bias.
 
@@ -609,7 +609,8 @@ def plot_roc(
         Add preliminary watermark
     linestyles:
         List of linestyles
-
+    title: string
+        Plot title
     Returns
     -------
 
@@ -620,7 +621,7 @@ def plot_roc(
 
     if linestyles == None:
         linestyles = len(labels) * ['-']
-        
+
     for table, label, linestyle in zip(roc_tables, labels, linestyles):
         
         ax.plot(table['false_positive_rate'], 
@@ -634,7 +635,8 @@ def plot_roc(
                     'k.')
     ax.set_ylabel('True Positive Rate')
     ax.set_xlabel('False Positive Rate')
-    ax.set_title('ROC curve')
+    if len(title):
+        ax.set_title(title)
     ax.grid(True, which='both')
     ax.set_xlim([0, 1])
     ax.set_ylim([0, 1])

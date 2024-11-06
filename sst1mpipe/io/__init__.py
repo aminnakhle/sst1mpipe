@@ -31,5 +31,8 @@ from .io import (
     get_dl1_info,
     load_more_dl2_files,
     load_source_catalog,
-    load_distributions_sst1m
+    load_distributions_sst1m,
+    write_dl1_pedestals,
+    get_used_qe_simtel,
+    get_pde_correction_factors
 )

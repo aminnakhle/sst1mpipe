@@ -1202,6 +1202,34 @@ def event_selection(data, config=None):
     return data[mask]
 
 
+def stereo_delta_disp_cut(data, config=None):
+    """
+    Performs cut on minimum distance between the two reconstructed 
+    source positions. Input table must contain min_distance column
+    (in radians).
+
+    Parameters
+    ----------
+    data: pandas.DataFrame
+        Input DL2 stereo file
+    config: dict
+
+    Returns
+    -------
+    pandas.DataFrame
+
+    """
+    if (config['analysis']['stereo_delta_disp_cut_deg'] is not None) and ('min_distance' in data.columns):
+        mask = data['min_distance']*180/np.pi < config['analysis']['stereo_delta_disp_cut_deg']
+        logging.info('{} deg cut on min disp distance applied.'.format(config['analysis']['stereo_delta_disp_cut_deg']))
+        logging.info('N of events of stereo after delta disp cut: {} '.format(sum(mask)))
+        data_selected = data[mask].copy()
+        return data_selected
+    else:
+        logging.info('No cut on min disp distance applied.')
+        return data
+
+
 def get_finite(data, config=None, stereo=False):
 
     mask = np.ones(len(data), dtype=bool)
@@ -1843,4 +1871,3 @@ def plot_livetime(hdu_dir,objects=None,ignore_sources=[]):
     plt.ylabel('observation time [h]')
     plt.xticks(rotation=45)
     return f,ax
-

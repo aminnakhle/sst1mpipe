@@ -4,7 +4,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    version="0.6.0-dev",
+    version="0.7.1-dev",
     packages=find_packages(),
     install_requires=[
         'h5py',
@@ -22,6 +22,7 @@ setup(
     package_data={
         'sst1mpipe': [
             'data/*',
+            'tests/resources/camera_config.cfg',
         ],
     },
     extras_require={

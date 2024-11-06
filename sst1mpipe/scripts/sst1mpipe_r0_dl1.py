@@ -50,14 +50,17 @@ from sst1mpipe.io import (
     read_charge_images,
     write_wr_timestamps,
     write_charge_fraction,
-    write_dl1_info
+    write_dl1_info,
+    get_used_qe_simtel,
+    get_pde_correction_factors
 )
 
 from sst1mpipe.calib import (
     window_transmittance_correction,
     get_window_corr_factors,
     saturated_charge_correction,
-    Calibrator_R0_R1
+    Calibrator_R0_R1,
+    correct_MC_for_PDE_drop
 )
 
 from ctapipe.io import EventSource
@@ -170,7 +173,7 @@ def main():
     pixel_charges = args.pixel_charges
     reclean = args.reclean
     precise_timestamps = args.precise_timestamps
-   
+
     ismc = processing_info.guess_mc()
 
     if ismc:
@@ -210,6 +213,12 @@ def main():
         logging.info("Tel 1 Intensity correction factor: {}".format(config['NsbCalibrator']['intensity_correction']['tel_001']))
         logging.info("Tel 2 Intensity correction factor: {}".format(config['NsbCalibrator']['intensity_correction']['tel_002']))
 
+        if config['NsbCalibrator']['mc_correction_for_PDE']:
+            used_qe = get_used_qe_simtel(source)
+            logging.info("QE files used in the MC production (including the default ones): {}".format(' '.join(map(str, used_qe))))
+            pde_corr_factors = get_pde_correction_factors()
+            logging.info("PDE correction factors found in the calibration file mc_pde_correction_factors.json: %s", pde_corr_factors)
+
     else:
         source = SST1MEventSource([processing_info.input_file], max_events=max_events)
         source._subarray = get_subarray()
@@ -229,6 +238,7 @@ def main():
             logging.info('Using arrayEvtNum as event_id: input file contains SWAT array event IDs')
         else:
             logging.info('Using eventNumber as event_id: input file does not contain SWAT array event IDs')
+    
 
     if reclean:
         processing_info.output_file = os.path.join(outdir, processing_info.output_file.split('/')[-1].rstrip(".h5") + "_recleaned.h5")
@@ -244,11 +254,17 @@ def main():
         for key, value in config['ImageProcessor'][cleaner]['telescope_defaults'].items():
             config['ImageProcessor'][cleaner]['telescope_defaults'][key] = sorted(value, key=lambda x: x['min_nsb_level'], reverse=True)
 
+        for key, value in config['mean_charge_to_nsb_rate'].items():
+            config['mean_charge_to_nsb_rate'][key] = sorted(value, key=lambda x: x['mean_charge_bin_low'], reverse=True)
+
+        image_processor.clean.nsb_level = np.mean(pedestal_info.get_img_charge_mean())
+        image_processor.clean.config = config['ImageProcessor'][cleaner]
+        ped_mean_charge = np.ndarray(shape=[0,3])
+
     if reclean:
         dl1_charges = read_charge_images(input_file_px_charges)
         dl1_charges = dl1_charges[dl1_charges['n'] > config['ImageProcessor'][cleaner]['min_number_pedestals']]
         dl1_charges['mean_charge'] = np.average(dl1_charges['average_q'], axis=1)
-        ped_mean_charge = np.ndarray(shape=[0,3])
 
     shower_processor  = ShowerProcessor(subarray=source.subarray, config=config)
 
@@ -293,6 +309,14 @@ def main():
                     tel_string = get_tel_string(tel, mc=False)
                     location = get_location(config=config, tel=tel_string)
                     swap_modules = get_swap_flag(event)
+                    if (cleaner == 'ImageCleanerSST'):
+                        charge_to_nsb = config['mean_charge_to_nsb_rate'][tel_string]
+                        for setting in charge_to_nsb:
+                            min_charge = setting['mean_charge_bin_low']
+                            nsb_rate = setting['nsb_rate']
+                            if image_processor.clean.nsb_level >= min_charge:
+                                break
+                        logging.info('Average charge from the first batch of pedestal events is %f which corresponds to NSB level %s in %s', image_processor.clean.nsb_level, nsb_rate, tel_string)
 
                 event.trigger.tels_with_trigger = [tel]
 
@@ -332,11 +356,24 @@ def main():
             # and simulation histogram is not saved. Here we repace it with an array of zeros.
             if source.is_simulation:
                 event = correct_true_image(event)
+                # Now include PDE correction based on the PDE drop set in MC
+                if config['NsbCalibrator']['mc_correction_for_PDE']:
+                    event = correct_MC_for_PDE_drop(event, 
+                        simtel_config_qe=used_qe,
+                        pde_corr_factors=pde_corr_factors
+                        )
 
             # This function flags the bad pixel according to the cfg file, and just for sure also kills the waveforms.
             # Charges in these pixels are then interpolated using method set in cfg: invalid_pixel_handler_type
             # Default is NeighborAverage, but can be turned off with 'null'
             event = remove_bad_pixels(event, config=config)
+
+            if (not source.is_simulation) and (not reclean) and pedestal_info.pedestals_in_file:
+                # ALWAYS use adaptive cleaning - take data from online pedestal_info
+                image_processor.clean.average_charge = pedestal_info.get_img_charge_mean()
+                image_processor.clean.stdev_charge = pedestal_info.get_img_charge_std()
+                # in the current setup this value is common for the whole file but keep it like this for the future
+                ped_mean_charge = np.append(ped_mean_charge, [[event.index.obs_id, event.index.event_id, image_processor.clean.nsb_level]], axis=0)
 
             #set proper charge info according to time bins of pedestal events
             if reclean and (len(dl1_charges) > 0):
@@ -348,7 +385,6 @@ def main():
                 image_processor.clean.nsb_level = meanQ
                 image_processor.clean.config = config['ImageProcessor'][cleaner]
                 ped_mean_charge = np.append(ped_mean_charge, [[event.index.obs_id, event.index.event_id, meanQ]], axis=0)
-                processing_info.frac_rised += image_processor.clean.frac_rised
 
             r1_dl1_calibrator(event) # r1->dl1a (images, peak times)                
 
@@ -365,6 +401,9 @@ def main():
                     )
 
             image_processor(event) # dl1a->dl1b (hillas parameters)
+
+            if (cleaner == 'ImageCleanerSST') and not ismc:
+                processing_info.frac_rised += image_processor.clean.frac_rised
 
             ## Fill monitoring container with baseline info :
             if not source.is_simulation:
@@ -389,7 +428,7 @@ def main():
                     # Arbitrary cut, just to prevent too big showers from being used
                     # We also take only every x-th event to gain some cputime
                     if (sum(clenaning_mask) < 20) and not bool(i % 10):
-                        pedestal_info.add_ped_evt(event, cleaning_mask=clenaning_mask)
+                        pedestal_info.add_ped_evt(event, cleaning_mask=clenaning_mask, store_image=False)
 
                     # writing pedestal info in dl1
                     if ( (pedestal_info.processed_pedestals !=0) and \
@@ -401,7 +440,7 @@ def main():
                             containers=[event.mon.tel[tel].pedestal],
                         )
 
-                        
+
 
             # Extraction of pixel charge distribution for MC-data tuning
             if pixel_charges:
@@ -444,7 +483,7 @@ def main():
             # It cannot be done at this level, because: AttributeError: 'CameraHillasParametersContainer' object has no attribute 'disp'
 
             shower_processor(event) # dl1b->dl2 (reconstruction of stereo parameters, also energy/direction/classification in the future versions of ctapipe)
-            
+
             # Counting all triggered events
             processing_info.count_triggered(event, ismc=source.is_simulation)
 
@@ -465,12 +504,8 @@ def main():
             
             if not source.is_simulation:
                 I0 = event.dl1.tel[tel].parameters.hillas.intensity
-                if config['NsbCalibrator']['apply_global_Vdrop_correction']:
-                    VI = VAR_to_Idrop(np.median(pedestal_info.get_charge_std()**2),
-                                       tel)
-                    I_corr = I0/VI*config['NsbCalibrator']["intensity_correction"][tel_string]
-                else:
-                    I_corr = I0*config['NsbCalibrator']["intensity_correction"][tel_string]
+                # VN: to be consistent during the cleaning I had to move all gain drop corrections into calibration
+                I_corr = I0*config['NsbCalibrator']["intensity_correction"][tel_string]
                 event.dl1.tel[tel].parameters.hillas.intensity = I_corr
             else:
                 for tel in event.trigger.tels_with_trigger:
@@ -490,7 +525,7 @@ def main():
     # - some more parameters are extracted from other tables in the file and added to the parameters table for convenience
     # NOTE: unfortunately using this, units in all columns have to be dropped, because otherwise ctapipe merging tool fails.
     # I didn't find a solution, this should definitely be revisited!
-    if reclean and (len(dl1_charges) > 0):
+    if (not source.is_simulation) and ((reclean and (len(dl1_charges) > 0)) or pedestal_info.pedestals_in_file):
         write_extra_parameters(processing_info.output_file, config=config, ismc=ismc, meanQ=ped_mean_charge)
     else:
         write_extra_parameters(processing_info.output_file, config=config, ismc=ismc)
@@ -517,10 +552,12 @@ def main():
 
     # Logging all event counts
     processing_info.log_result_counts(ismc=source.is_simulation)
-    
-    if reclean and (len(dl1_charges) > 0):
+
+    if (not source.is_simulation) and ((reclean and (len(dl1_charges) > 0)) or pedestal_info.pedestals_in_file):
         logging.info('Average (per event) fraction of pixels (N/1296) with raised picture threshold: %f', processing_info.frac_rised/i)
-        
+        # to dump how many times particular pixels were raised
+        #image_processor.clean.dump()
+
     if source.is_simulation:
         # Cut on minimum mc_energy in the output file, which is needed if we want to safely combine MC from different productions
         # NOTE: This doesn't change the mc and histogram tab in the output files and this must be taken care of in performance

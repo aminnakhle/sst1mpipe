@@ -30,7 +30,8 @@ from sst1mpipe.utils import (
     add_event_id,
     get_tel_string,
     get_finite,
-    get_pointing_radec
+    get_pointing_radec,
+    stereo_delta_disp_cut
 )
 
 from astropy.io import fits
@@ -906,6 +907,31 @@ def load_dl1_pedestals(input_file):
     return pedestals
 
 
+def write_dl1_pedestals(input_file, pedestal_table=None):
+
+    """
+    Write table of pedestal events from DL1 file into 
+    another DL1 file. Typical usecase is to propagate 
+    pedestals from mono DL1 to stereo DL1.
+
+    Parameters
+    ----------
+    input_file: string
+        Path
+    
+    pedestal_table: astropy.table.Table
+
+    """
+
+    try:
+        write_table_hdf5(pedestal_table, input_file, 
+            append=True, path='/dl1/monitoring/telescope/pedestal', 
+            serialize_meta=False
+            )
+    except:
+        logging.warning('Writing pedestals into the file failed!')
+
+
 def load_extra_table(input_file, key=None, remove_column=None):
 
     table = read_table(input_file, key)
@@ -1301,6 +1327,8 @@ def load_more_dl2_files(files, config=None, gammaness_cut=None):
                     logging.info('N of events after gammaness cut: {}'.format(len(df)))
             else:
                 df = df0
+            if tel_setup == 'stereo':
+                df = stereo_delta_disp_cut(df, config=config)
 
             ## adding pipeline info
             df['RF_used'] = RF_used
@@ -1423,3 +1451,57 @@ def load_distributions_sst1m(dist_path=None, dl3_path=None):
     livetimes = np.array(livetimes).flatten()
 
     return histograms, histograms_diff, zeniths, obsids_sorted, livetimes, survived_ped, bins
+
+
+def get_used_qe_simtel(source):
+    """
+    Reads the simtel cfg file used to run current MC production and extracts
+    all Quntum efficiency (PDE) files listed there. There are also default (dummy)
+    PDE files there as the proper fields in simtel must be first initialized with
+    something before running. This is not dangerous as long us one does not 
+    use one of the real PDE files used for the real production as the dummy file..
+
+    Parameters
+    ----------
+    source: ctapipe.io.EventSource
+
+    Returns
+    -------
+    used_qe: numpy.array
+        Array of used PDEs to produce given simtel file
+
+    """
+
+    used_qe = []
+    stringlist=[x[1].decode('utf-8') for x in source.file_.history]
+    string_array = np.array(stringlist)
+    indices = np.arange(0, len(string_array))
+    index_array_eff = indices[np.char.find(string_array, 'QUANTUM_EFFiciency') != -1]
+    for string in string_array[index_array_eff]:
+        s = string.replace('QUANTUM_EFFiciency ', '').split('%')[0].strip()
+        used_qe.append(s[:s.rfind('.')])
+    return np.array(used_qe)
+
+
+def get_pde_correction_factors():
+    """
+    Reads the default calibration file containing the PDE
+    corrections for different PDE files used in MC production.
+    The file is expected to be stored in ../data/mc_pde_correction_factors.json
+
+    Returns
+    -------
+    pde_corr: dict
+
+    """
+
+    try:
+        default_pde_corr_file = 'mc_pde_correction_factors.json'
+        pde_corr_file = pkg_resources.resource_filename('sst1mpipe',path.join('data',default_pde_corr_file))
+
+        with open(pde_corr_file) as json_file:
+                pde_corr = Config(json.load(json_file))
+        return pde_corr
+    except:
+        logging.error('%s file not found! Either make sure it is there, or turn off the PDE correction in the cfg file!'.format(pde_corr_file))
+        exit()

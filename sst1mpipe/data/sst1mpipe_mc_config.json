@@ -17,6 +17,7 @@
       "global_theta_cut": 0.2,
       "global_gammaness_cut": 0.6,
       "gamma_efficiency": 0.6,
+      "stereo_delta_disp_cut_deg": null,
       "significance_fit": true,
       "log_energy_min_tev":-1,
       "log_energy_max_tev": 3,
@@ -62,7 +63,8 @@
       "intensity_correction": {
         "tel_001": 1.0,
         "tel_002": 1.0
-      }
+      },
+      "mc_correction_for_PDE": true
   },
 
     "ImageProcessor": {
@@ -87,7 +89,7 @@
             "tel_001": [
             {
                 "min_nsb_level": 0,
-                "stdev_scaling": 2.5,
+                "stdev_scaling": 2,
                 "picture_threshold_pe": 7,
                 "boundary_threshold_pe": 2.5,
                 "min_picture_neighbors": 2,
@@ -96,10 +98,10 @@
                 "time_limit_ns" : 8,
                 "only_main_island" : false
             }, {
-                "min_nsb_level": 100000,
-                "stdev_scaling": 2.5,
-                "picture_threshold_pe": 8,
-                "boundary_threshold_pe": 4,
+                "min_nsb_level": 2.3554,
+                "stdev_scaling": 2,
+                "picture_threshold_pe": 7,
+                "boundary_threshold_pe": 2.5,
                 "min_picture_neighbors": 2,
                 "keep_isolated": false,
                 "min_time_neighbors" : 1,
@@ -109,7 +111,7 @@
             "tel_002": [
             {
                 "min_nsb_level": 0,
-                "stdev_scaling": 2.5,
+                "stdev_scaling": 2,
                 "picture_threshold_pe": 8,
                 "boundary_threshold_pe": 2.5,
                 "min_picture_neighbors": 2,
@@ -118,10 +120,10 @@
                 "time_limit_ns" : 8,
                 "only_main_island" : false
             }, {
-                "min_nsb_level": 100000,
-                "stdev_scaling": 2.5,
+                "min_nsb_level": 2.4287,
+                "stdev_scaling": 2,
                 "picture_threshold_pe": 8,
-                "boundary_threshold_pe": 4,
+                "boundary_threshold_pe": 2.5,
                 "min_picture_neighbors": 2,
                 "keep_isolated": false,
                 "min_time_neighbors" : 1,
