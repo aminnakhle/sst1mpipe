@@ -389,7 +389,8 @@ def plot_energy_resolution(
         e_bins, e_tables=None, labels=None, 
         markers=None, axes=None, plot=None, 
         preliminary=False,
-        skip_bins_first=0, skip_bins_last=0):
+        skip_bins_first=0, skip_bins_last=0,
+        titles=['Energy resolution', 'Energy bias']):
     """
     Plots energy resolution and bias.
 
@@ -412,6 +413,8 @@ def plot_energy_resolution(
         Skip certain number of first bins, e.g. with very low number of events
     skip_bins_last: float
         Skip certain number of last bins
+    titles: list of strings
+        Plot titles
 
     Returns
     -------
@@ -455,13 +458,14 @@ def plot_energy_resolution(
         axes[0].set_ylabel(r"$(\Delta E/E_\mathrm{true})_{68}$")
         axes[0].set_xlabel(r'$E_\mathrm{true}$' + ' [' + energy_center_unit + ']')
         axes[0].set_xscale('log')
-        axes[0].set_title('Energy resolution')
+        if len(titles):
+            axes[0].set_title(titles[0])
+            axes[1].set_title(titles[1])
         axes[0].set_xlim([min(e_bins['energy_bins'].value), max(e_bins['energy_bins'].value)])
         axes[0].set_ylim([0, 0.7])
         axes[0].grid(True, which='both')
         axes[0].label_outer()
-        axes[1].set_xscale('log')
-        axes[1].set_title('Energy bias')
+        axes[1].set_xscale('log')            
         axes[1].grid(True, which='both')
         axes[1].set_ylabel("Energy bias")
         axes[1].set_xlim([min(e_bins['energy_bins'].value), max(e_bins['energy_bins'].value)])
@@ -492,7 +496,8 @@ def plot_energy_resolution(
             axes[0].set_ylabel(r"$(\Delta E/E_\mathrm{true})_{68}$")
             axes[0].set_xlabel(r'$E_\mathrm{true}$' + ' [' + energy_center_unit + ']')
             axes[0].set_xscale('log')
-            axes[0].set_title('Energy resolution')
+            if len(titles):
+                axes[0].set_title(titles[0])
             axes[0].set_xlim([min(e_bins['energy_bins'].value), max(e_bins['energy_bins'].value)])
             axes[0].set_ylim([0, 0.8])
             axes[0].grid(True, which='both')
@@ -518,11 +523,12 @@ def plot_energy_resolution(
             energy_center_unit = energy_center.unit.to_string("latex")
             axes[0].legend()
             axes[0].set_xscale('log')
-            axes[0].set_title('Energy bias')
+            if len(titles):
+                axes[0].set_title(titles[0])
             axes[0].grid(True, which='both')
             axes[0].set_ylabel("Energy bias")
             axes[0].set_xlim([min(e_bins['energy_bins'].value), max(e_bins['energy_bins'].value)])
-            axes[0].set_ylim([-0.7, 0.7])
+            axes[0].set_ylim([-0.3, 0.3])
             axes[0].set_ylabel(r"bias (median($E_\mathrm{reco}/E_\mathrm{true}$ - 1)")
             axes[0].set_xlabel(r'$E_\mathrm{true}$' + ' [' + energy_center_unit + ']')
 
@@ -532,7 +538,8 @@ def plot_energy_resolution(
 def plot_angular_resolution(
         e_bins, a_tables=None, labels=None, 
         markers=None, ax=None, preliminary=False,
-        skip_bins_first=0, skip_bins_last=0):
+        skip_bins_first=0, skip_bins_last=0,
+        title='Angular resolution'):
     """
     Plots energy resolution and bias.
 
@@ -551,6 +558,8 @@ def plot_angular_resolution(
         Skip certain number of first bins, e.g. with very low number of events
     skip_bins_last: float
         Skip certain number of last bins
+    title: string
+        Plot title
 
     Returns
     -------
@@ -583,7 +592,8 @@ def plot_angular_resolution(
     ax.set_ylabel('Angular Resolution [deg]')
     ax.set_xlabel(r'$E_\mathrm{true}$' + ' ['+ energy_center_unit + ']')
     ax.set_xscale('log')
-    ax.set_title('Angular resolution')
+    if len(title):
+        ax.set_title(title)
     ax.grid(True, which='both')
     ax.set_xlim([min(e_bins['energy_bins'].value), max(e_bins['energy_bins'].value)])
     ax.set_ylim([0, 0.6])
@@ -611,6 +621,7 @@ def plot_roc(
         List of linestyles
     title: string
         Plot title
+
     Returns
     -------
 
