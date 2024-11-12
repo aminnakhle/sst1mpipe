@@ -1863,7 +1863,7 @@ def plot_livetime(hdu_dir,objects=None,ignore_sources=[]):
              label=r'{} : {:} h'.format("total".ljust(11),np.round(ds.obs_table['LIVETIME'].sum()/60/60,1)))
 
     for obj in objects:
-        if obj not in ignore:
+        if obj not in ignore_sources:
             plt.plot([datetime.fromtimestamp(t) for t in d_obs[obj][0]],
                      [np.sum(d_obs[obj][1][:ii])/60/60 for ii in range(len(d_obs[obj][1]))],
                      label=r'{} : {:} h'.format(obj.ljust(11),np.round(np.sum(d_obs[obj][1])/60/60,1)))
