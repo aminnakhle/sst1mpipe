@@ -520,9 +520,10 @@ def get_closest_rf_model(
                     break
             logging.info('Average charge from pedestal events in the file is %f.', nsb_level)
             idx_closest = np.argmin(abs(models_tab[:, 0].astype(np.float64) - tel_ze) + 666*abs(models_tab[:, 2].astype(np.float64) - nsb_rates[tel][meanQ_low]))
+        # If meanQ is not provided we do not care about the NSB bin
         else:
-            nsb_rate_default=100
-            idx_closest = np.argmin(abs(models_tab[:, 0].astype(np.float64) - tel_ze) + 666*abs(models_tab[:, 2].astype(np.float64) - nsb_rate_default))
+            #nsb_rate_default=100
+            idx_closest = np.argmin(abs(models_tab[:, 0].astype(np.float64) - tel_ze)) # + 666*abs(models_tab[:, 2].astype(np.float64) - nsb_rate_default))
 
         closest_model_dir = os.path.join(models_dir, models_tab[idx_closest, 3])
         logging.info('Closest RF node found: %s', closest_model_dir)

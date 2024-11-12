@@ -139,12 +139,14 @@ def main():
 
             logging.info('Reconstruction for %s', tel)
             dl1 = load_dl1_sst1m(output_file, tel=tel, config=config, table='pandas', stereo=stereo, check_finite=True, quality_cuts=False)
-
+            # JJ: I turned off selection based on NSB as it is probably not going to be used anyway
+            """
             if 'meanQ' in dl1:
                 meanQ = np.average(dl1['meanQ'])
                 models_dir_auto = get_closest_rf_model(dl1, models_dir=models_dir, nsb_level=meanQ, tel=tel, config=config)
             else:
-                models_dir_auto = get_closest_rf_model(dl1, models_dir=models_dir)
+            """
+            models_dir_auto = get_closest_rf_model(dl1, models_dir=models_dir)
             try:
                 dl2_0 = pd.concat([dl2_0, apply_models(dl1, models_dir=models_dir_auto, config=config, telescope=tel, stereo=stereo, mc=ismc)])
             except:
@@ -176,12 +178,14 @@ def main():
 
             logging.info('Reconstruction for %s', tel)
             dl1 = load_dl1_sst1m(output_file, tel=tel, config=config, table='pandas', stereo=stereo, check_finite=True, quality_cuts=False)
-
+            # JJ: I turned off selection based on NSB as it is probably not going to be used anyway
+            """
             if 'meanQ' in dl1:
                 meanQ = np.average(dl1['meanQ'])
                 models_dir_auto = get_closest_rf_model(dl1, models_dir=models_dir, nsb_level=meanQ, tel=tel, config=config)
             else:
-                models_dir_auto = get_closest_rf_model(dl1, models_dir=models_dir)
+            """
+            models_dir_auto = get_closest_rf_model(dl1, models_dir=models_dir)
             try:
                 dl2 = apply_models(dl1, models_dir=models_dir_auto, config=config, telescope=tel, stereo=stereo, mc=ismc)
             except:
