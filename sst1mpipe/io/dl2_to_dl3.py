@@ -117,7 +117,14 @@ def photon_df_to_fits(dl2_photons,
         gammaness_cut = config['analysis']['global_gammaness_cut']
     else: 
         gammaness_cut = 'energydep'
-    irf_name   = "{}_gc{}".format(RF_used, gammaness_cut)
+
+    # Removing NSB info from the RF_used string
+    try:
+        name = RF_used.split('_nsb')[0]
+    except:
+        name = RF_used
+    logging.info('Expected IRF name for given DL3 file: %s', name)
+    irf_name = "{}_gc{}".format(name, gammaness_cut)
     pipeline_version = dl2_photons["sst1mpipe_version"].iloc[0]
 
     ########### Build TABLE
