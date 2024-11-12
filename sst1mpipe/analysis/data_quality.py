@@ -201,7 +201,8 @@ def make_DQ_table(tel_setup,
                   mc_hist_file,
                   outdir,
                   Q_min=400,
-                  Q_max=4000):
+                  Q_max=4000,
+                  sel_dict=DEFAULT_CUTS):
     def lin(x,a,b):
         return a*x+b
     if tel_setup=='stereo':
@@ -255,7 +256,7 @@ def make_DQ_table(tel_setup,
                 res_dict["ped_fraction"].append(read_table(filename,'survived_pedestal_frac')[0][0])
                 res_dict["tc_raised_fraction"].append(read_table(filename,'recleaned_fraction')[0][0])
                 res_dict["NSB"].append(read_table(filename,'NSB')[0][0])
-                res_dict["MC_rate_ratio"].append(10**popt[0]/np.cos(zenith*u.deg))
+                res_dict["MC_rate_ratio"].append(10**popt[0]/np.cos(zenith*u.deg).to_value())
                 res_dict["failed_fit"].append(0)
                 res_dict["qual_flag"].append(0)
             except:
@@ -271,7 +272,7 @@ def make_DQ_table(tel_setup,
                 print("fit failed",filename)
 
         res = pd.DataFrame(res_dict)
-        res["qual_flag"] = make_selection(res)
+        res["qual_flag"] = make_selection(res,sel_dict=sel_dict)
         outfile = outdir+'/DQ_table_{}.h5'.format(tel_setup)
         res.to_hdf(outfile,'DQ_table_{}'.format(tel))
     
