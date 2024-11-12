@@ -770,13 +770,17 @@ class irf_maker:
         self.azimuth      = int(round(tel_az/10.)*10)
 
         # /data/... is mandatory scheme. if not used, the hdu indexer cannot merge photon lists with IRFs
-        # TODO: deal with the NSB bin
-        self.outdir = output_dir + '/data/sst1m_{}/{}/bcf/ze{}_az{}_nsb100_gc{}/'.format(self.tel_setup,
+        # TODO: deal with the NSB bin if needed, removing NSB from the IRF name for now
+        #self.outdir = output_dir + '/data/sst1m_{}/{}/bcf/ze{}_az{}_nsb100_gc{}/'.format(self.tel_setup,
+        #                                                            self.pipeline_version,
+        #                                                            self.zenith_angle,
+        #                                                            self.azimuth,
+        #                                                            self.gammaness_cut_tag)
+        self.outdir = output_dir + '/data/sst1m_{}/{}/bcf/ze{}_az{}_gc{}/'.format(self.tel_setup,
                                                                     self.pipeline_version,
                                                                     self.zenith_angle,
                                                                     self.azimuth,
                                                                     self.gammaness_cut_tag)
-
         if point_like_offset is not None :
             ptlk_str = "_pointlike_{}deg".format(point_like_offset)
         else:
