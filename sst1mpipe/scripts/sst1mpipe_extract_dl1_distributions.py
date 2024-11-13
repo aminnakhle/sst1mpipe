@@ -241,7 +241,8 @@ def load_data(files, logs, config=None, tel=None, data_level='dl1'):
             NSB = VAR_to_NSB(pt['pedestal_charge_std'].mean(axis=1)**2, cs)
             nsb.append(NSB.mean())
         except:
-            print('No pedestals in : ' + input_file + ', skipping.')
+            print('No pedestals in : ' + input_file + '.')
+            nsb.append(np.nan)
 
         if i == 0:
             data = df
