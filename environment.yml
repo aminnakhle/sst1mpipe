@@ -1,4 +1,4 @@
-name: sst1m-0.7.2
+name: sst1m-dev
 channels:
   - conda-forge
   - default
