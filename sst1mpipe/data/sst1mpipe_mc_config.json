@@ -89,9 +89,9 @@
             "tel_001": [
             {
                 "min_nsb_level": 0,
-                "stdev_scaling": 2,
-                "picture_threshold_pe": 7,
-                "boundary_threshold_pe": 2.5,
+                "stdev_scaling": 2.5,
+                "picture_threshold_pe": 8,
+                "boundary_threshold_pe": 4,
                 "min_picture_neighbors": 2,
                 "keep_isolated": false,
                 "min_time_neighbors" : 1,
@@ -99,9 +99,9 @@
                 "only_main_island" : false
             }, {
                 "min_nsb_level": 2.3554,
-                "stdev_scaling": 2,
-                "picture_threshold_pe": 7,
-                "boundary_threshold_pe": 2.5,
+                "stdev_scaling": 2.5,
+                "picture_threshold_pe": 8,
+                "boundary_threshold_pe": 4,
                 "min_picture_neighbors": 2,
                 "keep_isolated": false,
                 "min_time_neighbors" : 1,
@@ -111,9 +111,9 @@
             "tel_002": [
             {
                 "min_nsb_level": 0,
-                "stdev_scaling": 2,
+                "stdev_scaling": 2.5,
                 "picture_threshold_pe": 8,
-                "boundary_threshold_pe": 2.5,
+                "boundary_threshold_pe": 4,
                 "min_picture_neighbors": 2,
                 "keep_isolated": false,
                 "min_time_neighbors" : 1,
@@ -121,9 +121,9 @@
                 "only_main_island" : false
             }, {
                 "min_nsb_level": 2.4287,
-                "stdev_scaling": 2,
+                "stdev_scaling": 2.5,
                 "picture_threshold_pe": 8,
-                "boundary_threshold_pe": 2.5,
+                "boundary_threshold_pe": 4,
                 "min_picture_neighbors": 2,
                 "keep_isolated": false,
                 "min_time_neighbors" : 1,
