@@ -471,6 +471,76 @@ def get_gammaness_cuts(
     return mask_gg, mask_gp
 
 
+def get_edep_theta_cuts(
+        dl2_gamma, config=None, save_hdf=False, save_fig=False, 
+        outdir=None, energy_bins=None, telescope=None, efficiency=0.68):
+    """
+    Calculates energy dependent theta2 cuts.
+
+    Parameters
+    ----------
+    dl2_gamma: astropy.table.Table
+        DL2 MC point-like gamma table
+    config: dict
+    save_hdf: bool
+        If True it stores energy dependent gammaness 
+        cut table. It can be further used IRF production
+        or in DL2->DL3 step in the data analysis
+    save_fig: bool
+        If True it stores a plot of energy dependent
+        gammaness cuts
+    outdir: string
+    energy_bins: astropy.units.quantity.Quantity
+    telescope: string
+    efficiency: float
+       Requested fraction of events left after the cut in each energy bin. E.g. 0.68 gives angular resolution.
+
+    Returns
+    ------- 
+    theta_cuts: astropy.table.Table
+
+    """
+    min_events_bin = 100
+    requested_theta_efficiency = efficiency
+
+    theta_cuts = calculate_percentile_cut(
+            dl2_gamma["theta"],
+            dl2_gamma["reco_energy"] * u.TeV,
+            bins=energy_bins,
+            min_value=0.01 * u.deg,
+            max_value=1.0 * u.deg,
+            fill_value=0.5 * u.deg,
+            percentile=100 * requested_theta_efficiency,
+            smoothing=None,
+            min_events=min_events_bin,
+        )
+
+    if save_hdf:
+
+        outfile = outdir + '/theta_edep_cuts_'+telescope+'.h5'
+        write_table_hdf5(theta_cuts, outfile, path='theta_cuts', overwrite=True, append=True, serialize_meta=True)
+
+    if save_fig:
+
+        fig, ax = plt.subplots(1, 1, figsize=(8, 7))
+        ax.errorbar(theta_cuts['center'], 
+                    theta_cuts['cut'], 
+                    xerr=(theta_cuts['center'] - theta_cuts['low'], theta_cuts['high'] - theta_cuts['center']),
+                    fmt='o')
+
+        energy_center = theta_cuts['center']
+        ax.set_ylabel('theta cut')
+        ax.set_xlabel(rf'$E_R$ [{energy_center.unit.to_string("latex")}]')
+        ax.set_xscale('log')
+        ax.grid(True, which='both')
+        ax.set_xlim([min(theta_cuts['low'].value), max(theta_cuts['high'].value)])
+        ax.set_ylim([0, 1.])
+        fig.savefig(outdir + '/theta_edep_cuts_'+telescope+'.png', dpi=200)
+
+    return theta_cuts
+
+
+
 def get_theta(dl2, zero_alt=None, zero_az=None):
     """
     Calculates theta^2 for ON region
