@@ -657,8 +657,9 @@ def stereo_reconstruction(
                 telescope=telescope
                 )
             
+            azimuth_transformed = (src_pos_reco.az.to_value(u.deg) + 180) % 360 - 180            
             params.loc[mask, 'reco_alt'+sign.replace('reco_disp','')] = src_pos_reco.alt.deg
-            params.loc[mask, 'reco_az'+sign.replace('reco_disp','')] = src_pos_reco.az.deg
+            params.loc[mask, 'reco_az'+sign.replace('reco_disp','')] = azimuth_transformed
 
     # Now we have in params two azimuths and altitudes for each telescope, generated 
     # using either + or - sign togther with the reconstructd disp_norm. We now need 

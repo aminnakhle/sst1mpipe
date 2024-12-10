@@ -1338,7 +1338,7 @@ def camera_to_altaz(pos_x, pos_y, focal, pointing_alt, pointing_az, config=None,
     )
     camera_coord = SkyCoord(pos_x, pos_y, frame=camera_frame)
     horizon = camera_coord.transform_to(horizon_frame)
-
+    
     return horizon
 
 

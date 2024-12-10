@@ -157,12 +157,12 @@ def main():
         # We have reconstructed energies, gammaness and disp norm per telescope.
         # Now we need to group everything per event and calculate averages.
         # For arrival dirrection, we apply MARS like reconstruction
-        try:
-            dl2 = stereo_reconstruction(dl2_0, config=config, ismc=ismc, telescopes=telescopes)
-        except:
-            logging.error('Stereo reconstruction failed.')
-            os.remove(output_file)
-            exit()
+        #try:
+        dl2 = stereo_reconstruction(dl2_0, config=config, ismc=ismc, telescopes=telescopes)
+        #except:
+        #    logging.error('Stereo reconstruction failed.')
+        #    os.remove(output_file)
+        #    exit()
 
         # NOTE: DL2 table from stereo is stored in dl2/event/parameters/stereo
         # This is probably not in accordance with the ctapipe datamodel and should be changed in the future
