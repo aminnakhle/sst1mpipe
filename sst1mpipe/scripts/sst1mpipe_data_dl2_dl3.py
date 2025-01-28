@@ -97,7 +97,7 @@ def parse_args():
                     help='Dir with gammaness cuts optimized on MC. The subdir structure should follow the same logic as the RF model directories. By default global gammaness cut from the config file is used.',
                     default=None
                     )
-
+                    
     args = parser.parse_args()
     return args
 

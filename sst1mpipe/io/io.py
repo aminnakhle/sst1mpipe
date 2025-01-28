@@ -694,7 +694,7 @@ def load_more_dl1_tables_mono(
 def load_dl1_sst1m(
         input_file, tel=None, config=None, 
         table='astropy', check_finite=False, 
-        stereo=False, quality_cuts=False):
+        stereo=False, quality_cuts=False, scale_intensities=False):
     """
     Reads DL1 table from the input HDF file.
 
@@ -717,6 +717,9 @@ def load_dl1_sst1m(
     quality_cuts: bool
         If True event selection from the config 
         file is applied.
+    scale_intensities: bool
+        If True a global scale on Hillas Intensity of each shower 
+        is applied from config["NsbCalibrator"]["intensity_correction"]
     Returns
     -------
     data: pandas.DataFrame or astropy.table.Table
@@ -725,6 +728,11 @@ def load_dl1_sst1m(
 
     logging.info('Input file: %s', input_file) 
     events = read_table(input_file, "/dl1/event/telescope/parameters/" + tel)
+
+    if scale_intensities:
+        I_corr = float(config["NsbCalibrator"]["intensity_correction"][tel])
+        logging.info('Intensity correction of %f applied on %s data.', I_corr, tel)
+        events['camera_frame_hillas_intensity'] = events['camera_frame_hillas_intensity'] * I_corr
 
     if 'true_alt_tel' not in events.keys():
         try:
@@ -783,7 +791,8 @@ def load_dl1_sst1m(
 
 def load_dl2_sst1m(
         input_file, tel=None, config=None, 
-        table='astropy', energy_min=0.0):
+        table='astropy', energy_min=0.0,
+        scale_reco_energy=False):
     """
     Reads DL2 table from the input HDF file. If config
     is provided then event selection (according to the
@@ -801,6 +810,9 @@ def load_dl2_sst1m(
         or \'pandas\'
     energy_min: float
         Cut on minimum reconstructed energy [TeV]
+    scale_reco_energy: bool
+        If True a global scale on reconstructed energy of each shower 
+        is applied from config["analysis"]["reco_energy_scaling_factor"]
 
     Returns
     -------
@@ -815,6 +827,10 @@ def load_dl2_sst1m(
     if config:
         logging.info('Performing event selection.')
         events = event_selection(events, config=config)
+
+    if scale_reco_energy:
+        logging.warning('Reconstructed energy scaled by %f', float(config["analysis"]["reco_energy_scaling_factor"]))
+        events['reco_energy'] *= float(config["analysis"]["reco_energy_scaling_factor"])
 
     if energy_min > 0:
         events = events[events['reco_energy'] >= energy_min]
@@ -1200,7 +1216,8 @@ def get_dl1_info(file):
     return info
 
 
-def load_more_dl2_files(files, config=None, gammaness_cut=None):
+def load_more_dl2_files(files, config=None, 
+                        gammaness_cut=None):
     """
     Loads and merges more DL2 hdf files. If config file is provided
     event selection is applied. Along with a single merged DL2 table
