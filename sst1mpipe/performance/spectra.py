@@ -34,7 +34,9 @@ __all__ = [
     "CRAB_HAWC_2019",
     "CRAB_HAWC_2019_NN",
     "CRAB_VERITAS_2015",
-    "HESS_J1702"
+    "HESS_J1702",
+    "CRAB_HESS_2024",
+    "CRAB_LST_2023"
 ]
 
 # Surprisingly, ECPL class is not defined in pyirf, so we define it here
@@ -57,6 +59,54 @@ class PowerLawExpCutoff:
 
     def __repr__(self):
         return f"{self.__class__.__name__}({self.normalization} * (E / {self.e_ref})**{self.index} * exp (-E / {self.e_cutoff}))"
+
+# LogParabola in pyirf is with log_10, while in mane papers, it is defined as log_e
+class LogParabola_natural:
+    r"""
+    A log parabola flux parameterization with natural logaritm
+
+    .. math::
+
+        \Phi(E, \Phi_0, \alpha, \beta, E_\text{ref}) =
+        \Phi_0 \left(
+            \frac{E}{E_\text{ref}}
+        \right)^{\alpha + \beta \cdot \log_{10}(E / E_\text{ref})}
+
+    Attributes
+    ----------
+    normalization: astropy.units.Quantity[flux]
+        :math:`\Phi_0`,
+    a: float
+        :math:`\alpha`
+    b: float
+        :math:`\beta`
+    e_ref: astropy.units.Quantity[energy]
+        :math:`E_\text{ref}`
+    """
+
+    @u.quantity_input(
+        normalization=[DIFFUSE_FLUX_UNIT, POINT_SOURCE_FLUX_UNIT], e_ref=u.TeV
+    )
+    def __init__(self, normalization, a, b, e_ref=1 * u.TeV):
+        """Create a new LogParabola spectrum"""
+        self.normalization = normalization
+        self.a = a
+        self.b = b
+        self.e_ref = e_ref
+
+
+    @u.quantity_input(energy=u.TeV)
+    def __call__(self, energy):
+        e = (energy / self.e_ref).to_value(u.one)
+        return self.normalization * e ** (self.a + self.b * np.log(e))
+
+
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}({self.normalization} * (E / {self.e_ref})**({self.a} + {self.b} * log10(E / {self.e_ref}))"
+
+
+
 
 
 # ECPL parametrization of the Mrk 421
@@ -152,6 +202,19 @@ CRAB_HAWC_2019_NN = LogParabola(
 # https://arxiv.org/pdf/1508.06442.pdf 
 CRAB_VERITAS_2015 = LogParabola(
     normalization=3.75e-11 / (u.TeV * u.cm ** 2 * u.s), a=-2.467, b=-0.16, e_ref = 1 * u.TeV
+)
+
+# Log-parabola parametrization of CRAB (HESS 2024)
+# https://arxiv.org/pdf/2403.12608
+# DONT USE IT, there is a typo in the paper, the parametrization is wrong
+CRAB_HESS_2024 = LogParabola_natural(
+    normalization=4.06e-11 / (u.TeV * u.cm ** 2 * u.s), a=-2.530, b=-0.086, e_ref = 1 * u.TeV
+)
+
+# Log-parabola parametrization of CRAB (LST 2023)
+# https://arxiv.org/pdf/2306.12960 
+CRAB_LST_2023 = LogParabola_natural(
+    normalization=3.05e-10 / (u.TeV * u.cm ** 2 * u.s), a=-2.25, b=-0.114, e_ref = 400 * u.GeV
 )
 
 # HESS J1702−420A

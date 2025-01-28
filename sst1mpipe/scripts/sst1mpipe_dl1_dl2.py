@@ -84,6 +84,12 @@ def parse_args():
                         help='Stereo reconstruction. It assumes that there are coincident events in DL1 identified by \'event id\', meaning that each \'event id\' is exactly two times in the DL1 file.',
                         dest='stereo'
                         )
+    parser.add_argument(
+                        '--scale-intensities',
+                        action='store_true',
+                        help='Enables Hillas intensity scaling on the DL1 level. If used, for the reconstrucion, a global scale on Hillas Intensity of each shower is applied from config[\"NsbCalibrator\"][\"intensity_correction\"]. Note that this does not modify the Hillas intensity stored in the DL1 table of the DL2 file.',
+                        dest='scale_int'
+                        )
 
     args = parser.parse_args()
     return args
@@ -99,6 +105,7 @@ def main():
     output_cfgfile = os.path.join(outdir, input_file.split('/')[-1].rstrip(".h5") + "_dl2.cfg")
     models_dir = args.models_dir
     stereo = args.stereo
+    scale_int = args.scale_int
 
     check_outdir(outdir)
 
@@ -138,7 +145,7 @@ def main():
         for tel in telescopes:
 
             logging.info('Reconstruction for %s', tel)
-            dl1 = load_dl1_sst1m(output_file, tel=tel, config=config, table='pandas', stereo=stereo, check_finite=True, quality_cuts=False)
+            dl1 = load_dl1_sst1m(output_file, tel=tel, config=config, table='pandas', stereo=stereo, check_finite=True, quality_cuts=False, scale_intensities=scale_int)
             # JJ: I turned off selection based on NSB as it is probably not going to be used anyway
             """
             if 'meanQ' in dl1:
@@ -177,7 +184,7 @@ def main():
         for tel in telescopes:
 
             logging.info('Reconstruction for %s', tel)
-            dl1 = load_dl1_sst1m(output_file, tel=tel, config=config, table='pandas', stereo=stereo, check_finite=True, quality_cuts=False)
+            dl1 = load_dl1_sst1m(output_file, tel=tel, config=config, table='pandas', stereo=stereo, check_finite=True, quality_cuts=False, scale_intensities=scale_int)
             # JJ: I turned off selection based on NSB as it is probably not going to be used anyway
             """
             if 'meanQ' in dl1:

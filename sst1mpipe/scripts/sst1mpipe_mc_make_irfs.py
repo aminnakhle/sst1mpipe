@@ -63,7 +63,12 @@ def parse_args():
                     help='Directory with gammaness cut tables optimized on MC. If empty, global gammaness cut from the config file is used.',
                     default=None
                     )
-
+    parser.add_argument(
+                        '--scale-true-energies',
+                        action='store_true',
+                        help='Enables scaling of true energy for production of a biased IRFs. If used, a global scale on true energy of each shower is applied from config[\"analysis\"][\"true_energy_scaling_factor\"]. Note that this does not modify the true energy values stored in the DL2 files.',
+                        dest='true_energy_scaling'
+                        )
     args = parser.parse_args()
     return args
 
@@ -76,6 +81,7 @@ def main():
     input_file_proton = args.protons
     outdir = args.outdir
     gammaness_cut_dir = args.gammaness_cut_dir
+    true_energy_scaling = args.true_energy_scaling
 
     check_outdir(outdir)
 
@@ -108,7 +114,8 @@ def main():
                             mc_tel_setup = tel,
                             point_like_offset = None,
                             output_dir = outdir,
-                            gammaness_cuts = gammaness_cuts
+                            gammaness_cuts = gammaness_cuts,
+                            true_energy_scaling = true_energy_scaling,
                             )
 
         maker.make_all_irfs()

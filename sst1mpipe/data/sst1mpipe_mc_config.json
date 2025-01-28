@@ -31,6 +31,7 @@
       "nbins_source_offset": 501,
       "gamma_min_simulated_energy_tev": 0.2,
       "proton_min_simulated_energy_tev": 0.4,
+      "true_energy_scaling_factor": 1.0,
       "n_training_events": 7E5,
       "gamma_to_proton_training_ratio": 1.0,
       "stereo_reco_weights": "camera_frame_hillas_intensity",

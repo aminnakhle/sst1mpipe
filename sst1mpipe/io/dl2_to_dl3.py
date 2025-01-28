@@ -339,13 +339,13 @@ def dl2_dir_to_dl3(target_name   = None,
         df_dl2_unsort, times_unsort, GTIs = load_more_dl2_files(
                 all_files, 
                 config = config, 
-                gammaness_cut=config['analysis']['global_gammaness_cut'],
+                gammaness_cut=config['analysis']['global_gammaness_cut']
                 )
     else:
         df_dl2_unsort, times_unsort, GTIs = load_more_dl2_files(
                 all_files, 
                 config = config, 
-                gammaness_cut=gammaness_cuts,
+                gammaness_cut=gammaness_cuts
                 )
     df_dl2 = df_dl2_unsort.copy().sort_values("local_time").reset_index()
     times = np.array(times_unsort)

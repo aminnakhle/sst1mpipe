@@ -696,7 +696,8 @@ class irf_maker:
                  mc_tel_setup       = None,
                  point_like_offset  = None,
                  output_dir = './data/',
-                 gammaness_cuts = None
+                 gammaness_cuts = None,
+                 true_energy_scaling = False,
                  ):
 
         # This is arbitrary as the background is normalized in the analysis
@@ -708,6 +709,12 @@ class irf_maker:
         self.output_dir = output_dir
 
         self.config = load_config(self.config_filename)
+
+        # True energy scaling
+        if true_energy_scaling:
+            self.scaling_factor = float(self.config["analysis"]["true_energy_scaling_factor"])
+            logging.warning('True energies in IRFs scaled by a factor of %f.', self.scaling_factor)
+        else: self.scaling_factor = 1.
 
         if gammaness_cuts is None:
             self.gammaness_cut = self.config['analysis']['global_gammaness_cut']
@@ -753,11 +760,19 @@ class irf_maker:
                                        tel=mc_tel_setup)
         sim_info_proton = get_mc_info(mc_proton_filename)
 
+        if true_energy_scaling:
+            dl2_mc_gamma['true_energy'] *= self.scaling_factor
+            dl2_mc_proton['true_energy'] *= self.scaling_factor
+            self.sim_info.energy_min *= self.scaling_factor
+            self.sim_info.energy_max *= self.scaling_factor
+            sim_info_proton.energy_min *= self.scaling_factor
+            sim_info_proton.energy_max *= self.scaling_factor
+
         dl2_mc_proton = get_weights(dl2_mc_proton, 
                                     mc_info  = sim_info_proton, 
                                     obs_time = self.bg_obstime, 
                                     target_spectrum = DAMPE_P_He_SPECTRUM)
-
+                            
         self.gamma_event_dict  = self.table_to_selectedEvt_dict(dl2_mc_gamma)
         self.proton_event_dict = self.table_to_selectedEvt_dict(dl2_mc_proton)
 
@@ -878,7 +893,7 @@ class irf_maker:
     
     ############## AEFF ##############
     def make_aeff_irf(self):
-
+                
         if self.point_like :
             
             logging.info("Making Effective area (point-like).")
@@ -906,7 +921,7 @@ class irf_maker:
 
     ############## EDISP ##############
     def make_edisp_irf(self):
-
+        
         logging.info("Making Energy dispersion matrix.")
         edisp = energy_dispersion(selected_events  =self.gamma_event_dict, 
                                   true_energy_bins =self.e_bins_edisp, 
