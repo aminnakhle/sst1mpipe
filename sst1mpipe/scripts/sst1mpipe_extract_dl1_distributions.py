@@ -106,7 +106,11 @@ def main():
 
     # load all DL1 for given date
     files = glob.glob(data_path_dl1 + '/*_stereo.h5')
+    stereo = False
+    if len(files) > 0: stereo = True
+
     logs = glob.glob(data_path_dl1 + "/*.log")
+
     if len(files) == 0:
         files = glob.glob(data_path_dl1 + '/*dl1.h5')
     if len(files) == 0:
@@ -125,6 +129,12 @@ def main():
 
     for tel in tels:
         dl1_data, ped_fractions, recleaned_fractions, times, nsb = load_data(files, logs, config=None, tel=tel, data_level='dl1')
+
+        # NSB calculated for tel2 in stereo is not correct as only tel1 pedetals are propagated to the stereo DL1 files
+        if stereo & (str(tel[-1]) == '2'):
+            print('NSB level for tel2 cannot be calculed from the stereo DL1 file. The output table is filled with NaNs')
+            nsb = np.empty(len(times))
+            nsb.fill(np.nan)
 
         # iterate over obsids for given date and split data
         for obsid in obsids_date:
