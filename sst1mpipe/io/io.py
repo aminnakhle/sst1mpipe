@@ -1330,7 +1330,8 @@ def load_more_dl2_files(files, config=None,
                         logging.info('Energy dendent cut table used: {}'.format(cut_file))
                         cut_table = read_table_hdf5(cut_file, path='gammaness_cuts')
                     except:
-                        logging.warning("Cannot read gammaness cut file in the path: {}".format(gammaness_cut))
+                        logging.warning("Cannot read gammaness cut file in the path: {}".format(cut_file))
+                        cut_table = None
 
                     # This works only on pandas dataframe
                     df0_table = Table.from_pandas(df0)
