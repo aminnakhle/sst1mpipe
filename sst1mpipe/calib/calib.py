@@ -8,6 +8,8 @@ from sst1mpipe.utils import (
     VAR_to_Idrop
     )
 
+import time
+
 def get_default_window(telescope=None):
     """
     Provides default window transmissivity file, 
