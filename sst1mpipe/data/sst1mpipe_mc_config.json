@@ -198,7 +198,7 @@
         "HillasReconstructor_tel_impact_distance",
         "HillasReconstructor_h_max"
      ],
-        
+     
     "particle_classification_features": [
         "log_camera_frame_hillas_intensity",
         "camera_frame_hillas_width",

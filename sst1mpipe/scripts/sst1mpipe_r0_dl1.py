@@ -88,7 +88,6 @@ from ctapipe.io import (
 import astropy.units as u
 from astropy.time import Time
 
-
 def parse_args():
 
     parser = argparse.ArgumentParser(description="MC R1 or data R0 to DL1")
@@ -286,6 +285,10 @@ def main():
             final_histogram_tel1 = np.zeros(BINS)
             final_histogram_tel2 = np.zeros(BINS)
 
+    if not source.is_simulation and precise_timestamps:
+        full_seconds = []
+        fractional_seconds = []
+
     with DataWriter(
         source, output_path=processing_info.output_file, 
         overwrite        = True, 
@@ -333,13 +336,14 @@ def main():
                 # Add assumed pointing (this should be part of Event Source in the future)
                 # This stores the pointing information in the right containters. If done this way, pointing information is automaticaly propagated in
                 # the output DL1 file, in /dl1/monitoring/subarray/pointing and /dl1/monitoring/telescope/pointing/TEL
-                event = add_pointing_to_events(
-                                                event, 
-                                                ra=processing_info.pointing_ra, 
-                                                dec=processing_info.pointing_dec, 
-                                                telescope=tel, 
-                                                location=location
-                                                )
+                # OBSOLETE - this takes absurdly long time. From v>0.7.2 the pointing tables are written at the very end (no change in the output DL1 files)
+                #event = add_pointing_to_events(
+                #                                event, 
+                #                                ra=processing_info.pointing_ra, 
+                #                                dec=processing_info.pointing_dec, 
+                #                                telescope=tel, 
+                #                                location=location
+                #                                )
 
                 # Adding event_id and obs_id in event.index
                 # event_id is in event.sst1m.r0.event_id, but obs_id must be made up
@@ -367,14 +371,14 @@ def main():
             # Charges in these pixels are then interpolated using method set in cfg: invalid_pixel_handler_type
             # Default is NeighborAverage, but can be turned off with 'null'
             event = remove_bad_pixels(event, config=config)
-
+            
             if (not source.is_simulation) and (not reclean) and pedestal_info.pedestals_in_file:
                 # ALWAYS use adaptive cleaning - take data from online pedestal_info
                 image_processor.clean.average_charge = pedestal_info.get_img_charge_mean()
                 image_processor.clean.stdev_charge = pedestal_info.get_img_charge_std()
                 # in the current setup this value is common for the whole file but keep it like this for the future
                 ped_mean_charge = np.append(ped_mean_charge, [[event.index.obs_id, event.index.event_id, image_processor.clean.nsb_level]], axis=0)
-
+            
             #set proper charge info according to time bins of pedestal events
             if reclean and (len(dl1_charges) > 0):
                 for [start_time, n, Qped, sig_Qped, meanQ] in reversed(dl1_charges):
@@ -441,7 +445,6 @@ def main():
                         )
 
 
-
             # Extraction of pixel charge distribution for MC-data tuning
             if pixel_charges:
                 if not source.is_simulation:
@@ -498,7 +501,7 @@ def main():
 
             # Calculation of fraction of true charge which survived cleaning
             processing_info.count_survived_charge(event, ismc=source.is_simulation)
-
+            
             ## Correct (or not) the Voltage drop effect : Global correction on the intensity
             ## apply (or not) some absolute correction on the intensity
             
@@ -516,8 +519,20 @@ def main():
 
             writer(event)
 
+            # Extracting WR timestamps with high numerical precision
+            if not source.is_simulation and precise_timestamps:
+                localtime = event.sst1m.r0.tel[tel].local_camera_clock.astype(np.uint64)
+                S_TO_NS = np.uint64(1e9)
+                full_seconds.append(localtime // S_TO_NS)
+                fractional_seconds.append((localtime % S_TO_NS) / S_TO_NS)
+
+
         if max_events == None and source.is_simulation:
             writer.write_simulation_histograms(source)
+
+    if not source.is_simulation and precise_timestamps:
+        wr_timestamps = np.column_stack((full_seconds, fractional_seconds))
+    else: wr_timestamps=None
 
     # Write additional params in the DL1 file
     # - these are not defined in the ctapipe containers, but are necessary for (mono) reconstruction
@@ -526,9 +541,16 @@ def main():
     # NOTE: unfortunately using this, units in all columns have to be dropped, because otherwise ctapipe merging tool fails.
     # I didn't find a solution, this should definitely be revisited!
     if (not source.is_simulation) and ((reclean and (len(dl1_charges) > 0)) or pedestal_info.pedestals_in_file):
-        write_extra_parameters(processing_info.output_file, config=config, ismc=ismc, meanQ=ped_mean_charge)
+        write_extra_parameters(
+                processing_info.output_file, 
+                config=config, ismc=ismc, meanQ=ped_mean_charge, 
+                wr_timestamps=wr_timestamps
+                )
     else:
-        write_extra_parameters(processing_info.output_file, config=config, ismc=ismc)
+        write_extra_parameters(
+                processing_info.output_file, config=config, 
+                ismc=ismc, wr_timestamps=wr_timestamps
+                )
 
     if source.is_simulation:
         write_charge_fraction(
@@ -540,13 +562,17 @@ def main():
             )
 
     # Write WR timestamps with high numerical precision
-    if not source.is_simulation and precise_timestamps:
-        write_wr_timestamps(processing_info.output_file, 
-                            event_source=SST1MEventSource([processing_info.input_file], 
-                            max_events=max_events)
-                            )
+    # OBSOLETE - this function is extremely slow, there nos no reason why
+    # not to extract WR timestamps in the main event loop, which makes the
+    # it much faster
+    #if not source.is_simulation and precise_timestamps:
+    #    write_wr_timestamps(processing_info.output_file, 
+    #                        event_source=SST1MEventSource([processing_info.input_file], 
+    #                        max_events=max_events)
+    #                        )
 
-    # Write pointing information in the main DL1 table for convenience
+    # Write pointing information in the main DL1 table and in two monitoring tables
+    # It is important, as we do not do it per event anymore (it was very slow)
     if not source.is_simulation:
         write_assumed_pointing(processing_info, config=config)
 
@@ -598,7 +624,6 @@ def main():
             write_pixel_charges_table(data, bin_edges, names=names, output_file=processing_info.output_file_px_charges)
         else:
             logging.warning('There are no pedestal events in the file to fill the pixels charge histogram.')
-
 
 if __name__ == '__main__':
     main()

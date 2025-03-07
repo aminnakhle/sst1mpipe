@@ -308,7 +308,7 @@ def write_charge_fraction(file, survived_charge={}):
 
 
 def write_extra_parameters(
-        file, config=None, ismc=True, meanQ=None):
+        file, config=None, ismc=True, meanQ=None, wr_timestamps=None):
     """
     Opens the output DL1 file and adds some extra parameters
     to the DL1 table.
@@ -321,6 +321,8 @@ def write_extra_parameters(
     ismc: bool
     meanQ: numpy.ndarray
         Mean charge from pedestal events
+    wr_timestamps: numpy.array
+        White Rabbit timestamps, where first colums is fulle seconds, and second is fraction seconds
 
     Returns
     -------
@@ -349,6 +351,11 @@ def write_extra_parameters(
             merged_table = add_log_true_energy(merged_table)
 
         else:
+            
+            # write WR timestamps
+            if wr_timestamps is not None:
+                params['time_wr_full_seconds'] = wr_timestamps[:, 0]
+                params['time_wr_frac_seconds'] = wr_timestamps[:, 1]
 
             params["equivalent_focal_length"] = float(config['telescope_equivalent_focal_length'][tel])
 
@@ -496,35 +503,30 @@ def write_assumed_pointing(
         processing_info, config=None):
     """
     Writes pointing info (per event true_tel_az, true_tel_alt) 
-    in the main DL1 table.
+    in the main DL1 table. It also creates two monitoring tables 
+    with pointing information.
 
     Parameters
     ----------
-    file: string
-        Path
+    processing_info: 
+        Class Monitoring_R0_DL1
     config: dict
-    pointing_ra: float
-        RA in degress
-    pointing_dec: float
-        DEC in degress
 
     Returns
     -------
 
     """
-    file = processing_info.output_file
-    telescopes = get_telescopes(file)
+    dl1_file = processing_info.output_file
+    telescopes = get_telescopes(dl1_file)
+
+    pointing_ra = float(processing_info.pointing_ra) * u.deg
+    pointing_dec = float(processing_info.pointing_dec) * u.deg
+    wobble_coords = SkyCoord(ra=pointing_ra, dec=pointing_dec, frame='icrs')
 
     for tel in telescopes:
 
-        params = read_table(file, "/dl1/event/telescope/parameters/" + tel)
-
+        params = read_table(dl1_file, "/dl1/event/telescope/parameters/" + tel)
         location = get_location(config=config, tel=tel)
-
-        pointing_ra = float(processing_info.pointing_ra) * u.deg
-        pointing_dec = float(processing_info.pointing_dec) * u.deg
-
-        wobble_coords = SkyCoord(ra=pointing_ra, dec=pointing_dec, frame='icrs')
         time = Time(params['local_time'], format='unix', scale='utc')
         horizon_frame = AltAz(obstime=time, location=location)
         try:
@@ -532,7 +534,7 @@ def write_assumed_pointing(
             params['true_az_tel'] = tel_pointing.az.to_value(u.deg)
             params['true_alt_tel'] = tel_pointing.alt.to_value(u.deg)
         except ValueError:
-            logging.info("Broken file", file)
+            logging.info("Broken file", dl1_file)
             params['true_az_tel'] = np.nan
             params['true_alt_tel'] = np.nan
 
@@ -540,7 +542,24 @@ def write_assumed_pointing(
         # of the DL1 file remains the same
         # NOTE: Unfortunately, we cannot store units with serialize_meta, because these are stored somehow weirdly as a new table and ctapipe merge tool
         # then cannot merge the files and raise error...
-        params.write(file, path='/dl1/event/telescope/parameters/'+tel, overwrite=True, append=True) #, serialize_meta=True)
+        params.write(dl1_file, path='/dl1/event/telescope/parameters/'+tel, overwrite=True, append=True) #, serialize_meta=True)
+
+        # create new table with pointing and write: /dl1/monitoring/telescope/pointing/TEL
+        t = Table()
+        t['time'] = params['local_time']
+        t['azimuth'] = tel_pointing.az.to('rad')
+        t['altitude'] = tel_pointing.alt.to('rad')
+        t.write(dl1_file, path='/dl1/monitoring/telescope/pointing/'+tel, overwrite=True, append=True)
+
+    # create new tables with pointing and write: /dl1/monitoring/subarray/pointing
+    t = Table()
+    t['time'] = params['local_time']
+    t['array_azimuth'] = tel_pointing.az.to('rad')
+    t['array_altitude'] = tel_pointing.alt.to('rad')
+    t['array_ra'] = wobble_coords.ra.to('rad')
+    t['array_dec'] = wobble_coords.dec.to('rad')
+    t.write(dl1_file, path='/dl1/monitoring/subarray/pointing', overwrite=True, append=True)
+
 
 
 def write_r1_dl1_cfg(file, config=None):
