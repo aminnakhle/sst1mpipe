@@ -27,6 +27,7 @@ from gammapy.data import DataStore
 from astroquery.simbad import Simbad
 import pkg_resources
 from os import path
+import re
 
 
 def get_target(file, force_pointing=False):
@@ -95,15 +96,8 @@ def get_target(file, force_pointing=False):
             except ValueError:
                 logging.warning('Wrong format of coordinates in the fits header, cannot convert to float!')
                 ra, dec = None, None
-            if 'W1' in pointing_string:
-                wobble = 'W1'
-            elif 'W2' in pointing_string:
-                wobble = 'W2'
-            elif 'W3' in pointing_string:
-                wobble = 'W3'
-            elif 'W4' in pointing_string:
-                wobble = 'W4'
-            else: wobble = 'UNDEF'
+            match = re.search(r'W\d+', pointing_string)
+            wobble = match.group(0) if match else 'UNDEF'
         except KeyError:
             logging.warning('TARGET field is not in the fits header! Cannot read pointing RA, DEC. Are you sure that this is a valid file with science data?')
             target, ra, dec, wobble = None, None, None, None
