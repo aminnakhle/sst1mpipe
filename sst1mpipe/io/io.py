@@ -549,7 +549,11 @@ def write_assumed_pointing(
         t['time'] = params['local_time']
         t['azimuth'] = tel_pointing.az.to('rad')
         t['altitude'] = tel_pointing.alt.to('rad')
-        t.write(dl1_file, path='/dl1/monitoring/telescope/pointing/'+tel, overwrite=True, append=True)
+
+        # Convert units to metadata before saving
+        for col in t.colnames:
+            t[col].meta["unit"] = str(t[col].unit)
+        t.write(dl1_file, path='/dl1/monitoring/telescope/pointing/'+tel, overwrite=True, append=True, serialize_meta=True)
 
     # create new tables with pointing and write: /dl1/monitoring/subarray/pointing
     t = Table()
@@ -558,8 +562,11 @@ def write_assumed_pointing(
     t['array_altitude'] = tel_pointing.alt.to('rad')
     t['array_ra'] = wobble_coords.ra.to('rad')
     t['array_dec'] = wobble_coords.dec.to('rad')
-    t.write(dl1_file, path='/dl1/monitoring/subarray/pointing', overwrite=True, append=True)
 
+    # Convert units to metadata before saving
+    for col in t.colnames:
+        t[col].meta["unit"] = str(t[col].unit)
+    t.write(dl1_file, path='/dl1/monitoring/subarray/pointing', overwrite=True, append=True, serialize_meta=True)
 
 
 def write_r1_dl1_cfg(file, config=None):
