@@ -336,14 +336,14 @@ def main():
                 # Add assumed pointing (this should be part of Event Source in the future)
                 # This stores the pointing information in the right containters. If done this way, pointing information is automaticaly propagated in
                 # the output DL1 file, in /dl1/monitoring/subarray/pointing and /dl1/monitoring/telescope/pointing/TEL
-                # OBSOLETE - this takes absurdly long time. From v>0.7.2 the pointing tables are written at the very end (no change in the output DL1 files)
-                #event = add_pointing_to_events(
-                #                                event, 
-                #                                ra=processing_info.pointing_ra, 
-                #                                dec=processing_info.pointing_dec, 
-                #                                telescope=tel, 
-                #                                location=location
-                #                                )
+                # This takes absurdly long time - revisit in the future, checking if we can make it faster
+                event = add_pointing_to_events(
+                                                event, 
+                                                ra=processing_info.pointing_ra, 
+                                                dec=processing_info.pointing_dec, 
+                                                telescope=tel, 
+                                                location=location
+                                                )
 
                 # Adding event_id and obs_id in event.index
                 # event_id is in event.sst1m.r0.event_id, but obs_id must be made up
