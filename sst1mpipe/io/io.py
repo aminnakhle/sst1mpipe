@@ -503,8 +503,7 @@ def write_assumed_pointing(
         processing_info, config=None):
     """
     Writes pointing info (per event true_tel_az, true_tel_alt) 
-    in the main DL1 table. It also creates two monitoring tables 
-    with pointing information.
+    in the main DL1 table.
 
     Parameters
     ----------
@@ -543,30 +542,6 @@ def write_assumed_pointing(
         # NOTE: Unfortunately, we cannot store units with serialize_meta, because these are stored somehow weirdly as a new table and ctapipe merge tool
         # then cannot merge the files and raise error...
         params.write(dl1_file, path='/dl1/event/telescope/parameters/'+tel, overwrite=True, append=True) #, serialize_meta=True)
-
-        # create new table with pointing and write: /dl1/monitoring/telescope/pointing/TEL
-        t = Table()
-        t['time'] = params['local_time']
-        t['azimuth'] = tel_pointing.az.to('rad')
-        t['altitude'] = tel_pointing.alt.to('rad')
-
-        # Convert units to metadata before saving
-        for col in t.colnames:
-            t[col].meta["unit"] = str(t[col].unit)
-        t.write(dl1_file, path='/dl1/monitoring/telescope/pointing/'+tel, overwrite=True, append=True, serialize_meta=True)
-
-    # create new tables with pointing and write: /dl1/monitoring/subarray/pointing
-    t = Table()
-    t['time'] = params['local_time']
-    t['array_azimuth'] = tel_pointing.az.to('rad')
-    t['array_altitude'] = tel_pointing.alt.to('rad')
-    t['array_ra'] = wobble_coords.ra.to('rad')
-    t['array_dec'] = wobble_coords.dec.to('rad')
-
-    # Convert units to metadata before saving
-    for col in t.colnames:
-        t[col].meta["unit"] = str(t[col].unit)
-    t.write(dl1_file, path='/dl1/monitoring/subarray/pointing', overwrite=True, append=True, serialize_meta=True)
 
 
 def write_r1_dl1_cfg(file, config=None):
