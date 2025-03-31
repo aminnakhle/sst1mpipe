@@ -277,8 +277,8 @@ def main():
     for source in sources:
 
         logging.info(' ==== Preparing summary for source %s ==== ', source)
-        fig, ax = plt.subplots(1, 1, figsize=(12, 5)) # trigger rates
-        fig1, ax1 = plt.subplots(1, 1, figsize=(12, 5)) # trigger rates (zoom)
+        fig, ax = plt.subplots(1, 1, figsize=(12, 5)) # dl1 event rates
+        fig1, ax1 = plt.subplots(1, 1, figsize=(12, 5)) # dl1 event rates (zoom)
         fig2, ax2 = plt.subplots(1, 1, figsize=(12, 5)) # dl2 event rates
         fig3, ax3 = plt.subplots(1, 1, figsize=(12, 5)) # NSB
         fig4, ax4 = plt.subplots(1, 2, figsize=(12,5)) # distributions, tel1
@@ -361,13 +361,13 @@ def main():
                 is_dl3 = len(glob.glob(dl3_path+'/'+'*.fits'))
 
             if not is_dl1:
-                logging.warning('DL1 data is missing, there are gonna be some missing figures in the final PDF.')
+                logging.warning('DL1 data is missing, there will be some missing figures in the final PDF.')
             if not is_dl2:
-                logging.warning('DL2 data is missing, there are gonna be some missing figures in the final PDF.')
+                logging.warning('DL2 data is missing, there will be some missing figures in the final PDF.')
             if not is_dl3:
-                logging.warning('DL3 data is missing, there are gonna be some missing figures in the final PDF.')
+                logging.warning('DL3 data is missing, there will be some missing figures in the final PDF.')
             if not is_dist:
-                logging.warning('DL1 rate distributions are missing, there are gonna be some missing figures in the final PDF.')
+                logging.warning('DL1 rate distributions are missing, there will be some missing figures in the final PDF.')
             
             if telescope not in 'stereo':
                 stereo=False
@@ -407,7 +407,7 @@ def main():
                             h_tot += h1[0]
                             # pedestal table
                             if len(ped_table) > 0:
-                                plot_average_nsb_VS_time(ped_table,tt,ax=ax3, color=rate_colors[tel])
+                                plot_average_nsb_VS_time(ped_table,tt,ax=ax3, color=rate_colors[tel], label=None)
                             # CoGs - DL1 mono, survived cleaning
                             if tel == 'tel_021':
                                 h11, xedges, yedges = np.histogram2d(dl1['camera_frame_hillas_x'].dropna(), dl1['camera_frame_hillas_y'].dropna(), bins=100, range=[[-0.5, 0.5], [-0.5, 0.5]])
@@ -773,12 +773,13 @@ def main():
             for i in range(len(ax.get_xticklabels())):
                 time_unix = ax.get_xticklabels()[i].get_position()[0]
                 new_times.append(Time(time_unix, format='unix', scale='utc').isot.split('T')[1].split('.')[0])
+            ax.set_xticks(ax.get_xticks())
             t = ax.set_xticklabels(new_times) #, rotation='vertical')
             ax.set_xlabel('Time [UTC]')
             ax.set_ylabel('Trigger rate [Hz]')
             ax.grid()
             ax.legend()
-            ax.set_title('Trigger rates', fontsize=16)
+            ax.set_title('DL1 events (survived cleaning)', fontsize=16)
         
         # changing tick labels to UTC time
         if is_dl1:
@@ -786,13 +787,14 @@ def main():
             for i in range(len(ax1.get_xticklabels())):
                 time_unix = ax1.get_xticklabels()[i].get_position()[0]
                 new_times.append(Time(time_unix, format='unix', scale='utc').isot.split('T')[1].split('.')[0])
+            ax1.set_xticks(ax1.get_xticks())
             t = ax1.set_xticklabels(new_times) #, rotation='vertical')
             ax1.set_xlabel('Time [UTC]')
             ax1.set_ylabel('Trigger rate [Hz]')
             ax1.grid()
             ax1.legend()
             ax1.set_ylim([0, 2*max(median1)])
-            ax1.set_title('Trigger rates (zoom)', fontsize=16)
+            ax1.set_title('DL1 events (zoom)', fontsize=16)
 
         # changing tick labels to UTC time
         if is_dl2:
@@ -800,13 +802,14 @@ def main():
             for i in range(len(ax2.get_xticklabels())):
                 time_unix = ax2.get_xticklabels()[i].get_position()[0]
                 new_times.append(Time(time_unix, format='unix', scale='utc').isot.split('T')[1].split('.')[0])
+            ax2.set_xticks(ax2.get_xticks())
             t = ax2.set_xticklabels(new_times) #, rotation='vertical')
             ax2.set_xlabel('Time [UTC]')
             ax2.set_ylabel('Event rate [Hz]')
             ax2.set_ylim([0, 2*max(median2)])
             ax2.grid()
             ax2.legend()
-            ax2.set_title('Rates of reconstructed events', fontsize=16)
+            ax2.set_title('DL2 events', fontsize=16)
 
         if is_dl1:
             ax3.grid()
@@ -830,6 +833,7 @@ def main():
         fig11.savefig(outpath+'/moon.png', dpi=250)
         fig12.savefig(outpath+'/stereo_dt.png', dpi=250)
         fig13.savefig(outpath+'/theta2.png', dpi=250)
+        plt.close("all")
 
         # store pdf
         logging.info('Combining png images in the final pdf file.')
