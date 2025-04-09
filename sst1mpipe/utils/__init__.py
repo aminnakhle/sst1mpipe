@@ -57,7 +57,7 @@ from .utils import (
     get_swap_flag,
     get_sources_in_dir,
     get_moon_phase,
-    stereo_delta_disp_cut
+    stereo_var_cuts
 )
 
 from .cleaning import (

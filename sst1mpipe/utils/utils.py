@@ -1197,11 +1197,14 @@ def event_selection(data, config=None):
     return data[mask]
 
 
-def stereo_delta_disp_cut(data, config=None):
+def stereo_var_cuts(data, config=None):
     """
     Performs cut on minimum distance between the two reconstructed 
-    source positions. Input table must contain min_distance column
-    (in radians).
+    source positions and on variance of reco gammaness and energy 
+    from both telescopes. 
+    
+    Input table must contain min_distance column
+    (in radians), var_reco_energy and var_gammaness.
 
     Parameters
     ----------
@@ -1214,15 +1217,37 @@ def stereo_delta_disp_cut(data, config=None):
     pandas.DataFrame
 
     """
+    mask_disp = np.ones(len(data), dtype=bool)
+    mask_gammaness = np.ones(len(data), dtype=bool)
+    mask_energy = np.ones(len(data), dtype=bool)
+
     if (config['analysis']['stereo_delta_disp_cut_deg'] is not None) and ('min_distance' in data.columns):
-        mask = data['min_distance']*180/np.pi < config['analysis']['stereo_delta_disp_cut_deg']
+        mask_disp = data['min_distance']*180/np.pi < config['analysis']['stereo_delta_disp_cut_deg']
         logging.info('{} deg cut on min disp distance applied.'.format(config['analysis']['stereo_delta_disp_cut_deg']))
-        logging.info('N of events of stereo after delta disp cut: {} '.format(sum(mask)))
-        data_selected = data[mask].copy()
-        return data_selected
+        logging.info('N of events of stereo after delta disp cut: {} '.format(sum(mask_disp)))
     else:
         logging.info('No cut on min disp distance applied.')
-        return data
+
+    if (config['analysis']['stereo_relative_std_reco_energy_cut'] is not None) and ('var_reco_energy' in data.columns):
+        mask_energy = np.sqrt(data['var_reco_energy'])/data['reco_energy'] < config['analysis']['stereo_relative_std_reco_energy_cut']
+        logging.info('{} cut on max relative std of reco energy applied.'.format(config['analysis']['stereo_relative_std_reco_energy_cut']))
+        logging.info('N of events of stereo after relative std reco energy cut: {} '.format(sum(mask_energy)))
+    else:
+        logging.info('No cut on max relative std reco energy applied.')
+
+    if (config['analysis']['stereo_std_gammaness_cut'] is not None) and ('var_gammaness' in data.columns):
+        mask_gammaness = np.sqrt(data['var_gammaness']) < config['analysis']['stereo_std_gammaness_cut']
+        logging.info('{} cut on max std of reco gammaness applied.'.format(config['analysis']['stereo_std_gammaness_cut']))
+        logging.info('N of events of stereo after std reco gammaness cut: {} '.format(sum(mask_gammaness)))
+    else:
+        logging.info('No cut on max std reco gammaness applied.')
+
+    mask = mask_disp & mask_gammaness & mask_energy
+    
+    # JJ: .copy() complains: ValueError: values whose keys begin with an uppercase char must be Config instances: 'MC_correction_for_PDE', True
+    # I changed the config param to lower case, let's see what happens in the next versions
+    data_selected = data[mask] #.copy()
+    return data_selected
 
 
 def get_finite(data, config=None, stereo=False):
