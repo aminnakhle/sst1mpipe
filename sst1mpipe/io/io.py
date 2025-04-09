@@ -31,7 +31,7 @@ from sst1mpipe.utils import (
     get_tel_string,
     get_finite,
     get_pointing_radec,
-    stereo_delta_disp_cut
+    stereo_var_cuts
 )
 
 from astropy.io import fits
@@ -828,6 +828,11 @@ def load_dl2_sst1m(
     if config:
         logging.info('Performing event selection.')
         events = event_selection(events, config=config)
+        logging.info('N of events of %s after selection cuts: %d', tel, len(events))
+
+        if tel == 'stereo':
+            events = stereo_var_cuts(events, config=config)
+
 
     if scale_reco_energy:
         logging.warning('Reconstructed energy scaled by %f', float(config["analysis"]["reco_energy_scaling_factor"]))
@@ -837,7 +842,7 @@ def load_dl2_sst1m(
         events = events[events['reco_energy'] >= energy_min]
         logging.info('Cut on minumum reco energy > %f TeV applied.', energy_min)
 
-    logging.info('N of events of %s after selection cuts: %d', tel, len(events))
+    logging.info('N of DL2 events of %s after all input quality cuts: %d', tel, len(events))
 
     if table == 'astropy':
     
@@ -1346,8 +1351,6 @@ def load_more_dl2_files(files, config=None,
                     logging.info('N of events after gammaness cut: {}'.format(len(df)))
             else:
                 df = df0
-            if tel_setup == 'stereo':
-                df = stereo_delta_disp_cut(df, config=config)
 
             ## adding pipeline info
             df['RF_used'] = RF_used

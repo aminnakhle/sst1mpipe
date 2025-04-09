@@ -28,7 +28,6 @@ from sst1mpipe.io import(
 from sst1mpipe.utils import (
     check_same_shower_fraction,
     get_avg_pointing,
-    stereo_delta_disp_cut
 )
 
 from .spectra import DAMPE_P_He_SPECTRUM, CRAB_HEGRA
@@ -111,13 +110,9 @@ def evaluate_performance(
     ) * u.TeV
 
     dl2_gamma = load_dl2_sst1m(gamma_file, tel=telescope, config=config, table='pandas')
-    if telescope == 'stereo':
-        dl2_gamma = stereo_delta_disp_cut(dl2_gamma, config=config)
 
     if proton_file is not None:
         dl2_proton = load_dl2_sst1m(proton_file, tel=telescope, config=config, table='pandas')
-        if telescope == 'stereo':
-            dl2_proton = stereo_delta_disp_cut(dl2_proton, config=config)
 
         # Mixing gammas and protons
         gh_testing_dataset = pd.concat([dl2_gamma, dl2_proton], ignore_index=True)
@@ -864,9 +859,6 @@ class irf_maker:
         # JJ: .copy() complains: ValueError: values whose keys begin with an uppercase char must be Config instances: 'MC_correction_for_PDE', True
         # I changed the config param to lower case, let's see what happens in the next versions
         dl2_selected = dl2_data[mask_gg] #.copy()
-
-        # cut on delta disp
-        dl2_selected = stereo_delta_disp_cut(dl2_selected, config=self.config)
 
         # event selection is performed authomaticaly, if you provide load_dl2_sst1m with a config file
         # dl2_selected = event_selection(dl2_selected, config=self.config)

@@ -18,6 +18,8 @@
       "global_gammaness_cut": 0.6,
       "gamma_efficiency": 0.6,
       "stereo_delta_disp_cut_deg": null,
+      "stereo_relative_std_reco_energy_cut": null,
+      "stereo_std_gammaness_cut": null,
       "significance_fit": true,
       "log_energy_min_tev":-1,
       "log_energy_max_tev": 3,

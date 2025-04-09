@@ -616,7 +616,7 @@ def stereo_reconstruction(
     dl2 = get_stereo_dl2(params, ismc=ismc)
     dl2['log_reco_energy'] = energy_average
     dl2['reco_energy'] = 10**energy_average
-    dl2['var_reco_energy'] = 10**energy_var
+    dl2['var_reco_energy'] = (np.log(10)*10**energy_average)**2 * energy_var
     dl2['gammaness'] = gammaness_average
     dl2['var_gammaness'] = gammaness_var
 

@@ -36,7 +36,6 @@ from sst1mpipe.utils import (
     correct_number_simulated_showers,
     mc_correct_shower_reuse,
     check_same_shower_fraction,
-    stereo_delta_disp_cut
 )
 
 from .spectra import *
@@ -183,14 +182,17 @@ def relative_sensitivity(n_signal, n_background, alpha):
         alpha=alpha
     )
     n_excesses_5sigma = stat.n_sig_matching_significance(5)
+    sensitivity_5sigma_only = n_excesses_5sigma / (n_signal) * 100
+
     n_excesses_5sigma[n_excesses_5sigma < 10] = 10
+
     bkg_5percent = 0.05 * n_background * alpha
     if n_background > 0:
         n_excesses_5sigma[n_excesses_5sigma < bkg_5percent] = bkg_5percent[n_excesses_5sigma < bkg_5percent]
 
     sensitivity = n_excesses_5sigma / (n_signal) * 100  # percentage of Crab
 
-    return n_excesses_5sigma, sensitivity
+    return n_excesses_5sigma, sensitivity_5sigma_only, sensitivity
 
 
 def sensitivity_to_flux(
@@ -833,10 +835,6 @@ def sensitivity(
     dl2_gamma = load_dl2_sst1m(input_file_gamma, tel=telescope, config=config, table='astropy')
     dl2_proton = load_dl2_sst1m(input_file_proton, tel=telescope, config=config, table='astropy')
 
-    if telescope == 'stereo':
-        dl2_gamma = stereo_delta_disp_cut(dl2_gamma, config=config)
-        dl2_proton = stereo_delta_disp_cut(dl2_proton, config=config)
-
     mc_info_gamma = get_mc_info(input_file_gamma, config=config)
     mc_info_proton = get_mc_info(input_file_proton, config=config)
 
@@ -914,12 +912,14 @@ def sensitivity(
 
     # Get number of observed events in all energy bins
     sensitivity_all = np.zeros(len(energy_bins)-1)
+    sensitivity_5sigma_only_all = np.zeros(len(energy_bins)-1)
     sensitivity_flux_all = np.zeros(len(energy_bins)-1)
+    sensitivity_5sigma_only_flux_all = np.zeros(len(energy_bins)-1)
     sens_flux_err_minus = np.zeros(len(energy_bins)-1)
     sens_flux_err_plus = np.zeros(len(energy_bins)-1)
     energy = np.sqrt(energy_bins[:-1] * energy_bins[1:])
 
-    logging.info("SENSITIVITY: [e min, e max] TeV, N sim gammas, N sim protons, N excess, N bkg, sensitivity [\% Crab], sensitivity [TeV / (cm2 s)], sens err - [flux], sens err + [flux], fraction of G used N>1, fraction of P used N>1")
+    logging.info("SENSITIVITY: [e min, e max] TeV, N sim gammas, N sim protons, N excess, N bkg, sensitivity [5sigma only] [\% Crab], sensitivity [\% Crab], sensitivity [TeV / (cm2 s)], sens err - [flux], sens err + [flux], fraction of G used N>1, fraction of P used N>1")
     for i in range(len(energy_bins)-1):
         maskg = (gammas_on['reco_energy'] * u.TeV > energy_bins[i]) & (gammas_on['reco_energy'] * u.TeV <= energy_bins[i+1])
         N_observed_g = sum(gammas_on[maskg]['weight'])
@@ -947,10 +947,11 @@ def sensitivity(
 
         if (N_simulated_g > 10) & (N_simulated_p > 10) & (n_signal >= 0) & (n_off >= 0):
             # relative sensitivity in % or Crab (5sigma, excess > 5\% of background)
-            _, sensitivity = relative_sensitivity(n_signal, n_off, alpha)
+            _, sensitivity_5sigma_only, sensitivity = relative_sensitivity(n_signal, n_off, alpha)
 
             # Convert sensitivity to flux
             sensitivity_flux = sensitivity_to_flux(sensitivity, energy[i], target_spectrum=target_gamma_spectrum)
+            sensitivity_5sigma_only_flux = sensitivity_to_flux(sensitivity_5sigma_only, energy[i], target_spectrum=target_gamma_spectrum)
 
             # Uncertainty on sensitivity taking into account uncertainty in signal and backgound
             # We cannot calculate Poisson uncertainty from re-weighted events, because then it would be source dependent.
@@ -959,21 +960,25 @@ def sensitivity(
             err_n_off = np.sqrt(N_simulated_p) * n_off / N_simulated_p
 
             if n_off < err_n_off:
-                _, sens_better = relative_sensitivity(n_signal + err_n_signal, 0, alpha)
+                _, _, sens_better = relative_sensitivity(n_signal + err_n_signal, 0, alpha)
             else:
-                _, sens_better = relative_sensitivity(n_signal + err_n_signal, n_off - err_n_off, alpha)
-            _, sens_worse = relative_sensitivity(n_signal - err_n_signal, n_off + err_n_off, alpha)
+                _, _, sens_better = relative_sensitivity(n_signal + err_n_signal, n_off - err_n_off, alpha)
+            _, _, sens_worse = relative_sensitivity(n_signal - err_n_signal, n_off + err_n_off, alpha)
             sens_flux_better = sensitivity_to_flux(sens_better, energy[i], target_spectrum=target_gamma_spectrum)
             sens_flux_worse = sensitivity_to_flux(sens_worse, energy[i], target_spectrum=target_gamma_spectrum)
 
         else:
             sensitivity = np.nan
+            sensitivity_5sigma_only = np.nan
             sensitivity_flux = np.nan * u.TeV / (u.cm ** 2 * u.s)
+            sensitivity_5sigma_only_flux = np.nan * u.TeV / (u.cm ** 2 * u.s)
             sens_flux_better = np.nan * u.TeV / (u.cm ** 2 * u.s)
             sens_flux_worse = np.nan * u.TeV / (u.cm ** 2 * u.s)
 
         sensitivity_all[i] = sensitivity
+        sensitivity_5sigma_only_all[i] = sensitivity_5sigma_only
         sensitivity_flux_all[i] = sensitivity_flux.value
+        sensitivity_5sigma_only_flux_all[i] = sensitivity_5sigma_only_flux.value
         sens_flux_err_minus[i] = sensitivity_flux.value-sens_flux_better.value
         sens_flux_err_plus[i] = sens_flux_worse.value-sensitivity_flux.value
         if sens_flux_err_minus[i] < 0:
@@ -984,7 +989,7 @@ def sensitivity(
             logging.warning(f'[{energy_bins[i]:.2f}, {energy_bins[i+1]:.2f}], flux_sensitivity_err_plus cannot be estimated!')
         # We print also simulated (not weighted) number of protons and gammas after all cuts to see how good is the statistics 
         # on which the sensitivity is based
-        logging.info(f'[{energy_bins[i].to_value(u.TeV):6.1f}, {energy_bins[i+1].to_value(u.TeV):6.1f}], {N_simulated_g:4d}, {N_simulated_p:4d}, {n_signal:5.1f}, {n_off:5.1f}, {sensitivity:5.1f}, {sensitivity_flux.value:3.1E}, {sens_flux_err_minus[i]:3.1E}, {sens_flux_err_plus[i]:3.1E}, {fraction_g[i, 2]:3.1E}, {fraction_p[i, 2]:3.1E}')
+        logging.info(f'[{energy_bins[i].to_value(u.TeV):6.1f}, {energy_bins[i+1].to_value(u.TeV):6.1f}], {N_simulated_g:4d}, {N_simulated_p:4d}, {n_signal:5.1f}, {n_off:5.1f}, {sensitivity_5sigma_only:5.1f}, {sensitivity:5.1f}, {sensitivity_flux.value:3.1E}, {sens_flux_err_minus[i]:3.1E}, {sens_flux_err_plus[i]:3.1E}, {fraction_g[i, 2]:3.1E}, {fraction_p[i, 2]:3.1E}')
     
     # NOTE: This is uggly. We get rid of the units in order to merge everything in an array, and later adding the units after conversion
     # in the Astropy Table. 
@@ -1013,7 +1018,12 @@ def sensitivity(
                     fmt='o',
                     label='Diff. sensitivity of ' + telescope
                     )
-
+        plt.errorbar(energy, sensitivity_5sigma_only_flux_all,
+                    xerr=(energy - energy_bins[:-1], energy_bins[1:] - energy),
+                    fmt='.',
+                    alpha=0.5,
+                    label='5sigma condition only'
+                    )
         # Crab
         energy_smooth = np.logspace(-1, 3, 200) * u.TeV
         crab_flux = CRAB_MAGIC_JHEAP2015(energy_smooth)
