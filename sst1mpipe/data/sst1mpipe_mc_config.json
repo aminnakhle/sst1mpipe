@@ -213,9 +213,7 @@
         "camera_frame_hillas_x",
         "camera_frame_hillas_y",
         "HillasReconstructor_tel_impact_distance",
-        "HillasReconstructor_h_max",
-        "log_reco_energy",
-        "reco_disp_norm"
+        "HillasReconstructor_h_max"
       ],
 
     "disp_method": "disp_norm_sign",
