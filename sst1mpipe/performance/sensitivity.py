@@ -842,6 +842,7 @@ def sensitivity(
     # but for the resulting flux sensitivity it doesn't matter.
     logging.info('CRAB_HEGRA spectrum is used for purposes of sensitivity estimation.')
     target_gamma_spectrum = CRAB_HEGRA # CRAB_HEGRA, CRAB_MAGIC_JHEAP2015
+    #target_gamma_spectrum = CRAB_MAGIC_JHEAP2015
     dl2_gamma = get_weights(dl2_gamma, mc_info=mc_info_gamma, obs_time=obs_time, target_spectrum=target_gamma_spectrum)
     dl2_proton = get_weights(dl2_proton, mc_info=mc_info_proton, obs_time=obs_time, target_spectrum=DAMPE_P_He_SPECTRUM)
 
