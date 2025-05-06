@@ -42,7 +42,7 @@ Created on Wed Mar 23 16:36:22 2022
     -------
 
     usage exemple :
-    python dark_run_mes_fitter.py --year 2023 --month 2 --day 28 --tel 2 --first_file 129 --n_files 2 --save_plot False --save_dir ./calib
+    python dark_run_mes_fitter.py --year 2023 --month 2 --day 28 --tel first --2_file 129 --n_files 2 --save_plot False --save_dir ./calib
 
 """
 
@@ -69,6 +69,7 @@ import scipy.stats as scst
 import scipy.special as scsp
 
 import multiprocessing as mp
+from scipy.ndimage import convolve1d
 
 
 from iminuit import Minuit
@@ -90,6 +91,7 @@ class mes_fitter:
                  plot_dir     = './',
                  save_dir     = './calib_h5/',
                  max_evt      = 100000,
+                 peak_search_window_width = 5,
                  dark_baselines = None):
         """"
         Parameters
@@ -168,8 +170,16 @@ class mes_fitter:
             print("Warning : no files")
             
         self.res = None
+        self.peak_search_window_width = peak_search_window_width
+        self.n_sample = 50
+        self.samples=np.arange(self.n_sample)
+        self.param_names = [ 'dcr','X_talk', 'gain', 'sigma_pe', 'sigma_el',"x_el"]
 
     ##############################################
+
+    def set_file_list(self,file_list):
+        self.file_list = file_list
+
 
     def get_histograms(self):
         """
@@ -207,12 +217,33 @@ class mes_fitter:
                     tot_evts +=1
                     
                     if self.dark_baselines is None:
-                        Qsum = (r0data.adc_samples.T[-15:] - r0data.digicam_baseline).sum(axis=0)
-                        Qmax = (r0data.adc_samples.T       - r0data.digicam_baseline).max(axis=0)
-                    else:
-                        Qsum = (r0data.adc_samples.T[-15:] - self.dark_baselines ).sum(axis=0)
-                        Qmax = (r0data.adc_samples.T       - self.dark_baselines ).max(axis=0)
+                        wfs = (r0data.adc_samples.T - r0data.digicam_baseline).T
                         
+                        #sums = convolve1d(
+                        #    wfs[:,:],
+                        #    np.ones(self.peak_search_window_width), axis=1, mode="nearest"
+                        #    )
+                        #w_start = np.argmax(sums[:, self.peak_search_window_width//2:-(self.peak_search_window_width//2)],
+                        #                    axis=1)
+                        
+                        sums = np.array([np.convolve(wf, 
+                                                     np.ones(self.peak_search_window_width),
+                                                     mode="full") 
+                                        for wf in wfs])
+                        w_start = np.argmax(sums[:, self.peak_search_window_width-1:-self.peak_search_window_width+1],
+                                            axis=1)
+
+
+                        
+                        Qsum = np.array([wfs[ii,w_start[ii]:w_start[ii]+self.peak_search_window_width].sum() for ii in self.pixels])
+
+                        Qmax = (r0data.adc_samples.T       - r0data.digicam_baseline).max(axis=0)
+                        #Qsum_out = np.array([wfs[ii,:w_start[ii]].sum()+ \
+                        #                     wfs[ii,w_start[ii]+self.peak_search_window_width:].sum() for ii in self.pixels])
+                    else:
+                        #Qsum = (r0data.adc_samples.T[-15:] - self.dark_baselines ).sum(axis=0)
+                        #Qmax = (r0data.adc_samples.T       - self.dark_baselines ).max(axis=0)
+                        pass
 
                     i_to_fill_adcsum = np.searchsorted(centers_adcsum[1:-1], Qsum)
                     i_to_fill_adcmax = np.searchsorted(centers_adcmax[1:-1], Qmax)
@@ -236,7 +267,7 @@ class mes_fitter:
     
     ##############################################
    
-    def spe_spectrum_function(self,x, ll, xt, g, sigma_pe, sigma_el):
+    def spe_spectrum_function__s(self,x, ll, xt, g, sigma_pe, sigma_el):
         """
         single phot-electron spectrum fuction x -> MES(x) 
 
@@ -273,19 +304,163 @@ class mes_fitter:
     
             S = np.zeros_like(x)
             for n in range(0, 6):
-                xn = x0 + n * g
-                _sigma_n = sigma_n(n, sigma_pe, sigma_el)
-                
-                S += (
-                    (G_poisson(n,ll,xt))* 
-                    single_gauss(x, xn, _sigma_n)
-                )
+                if n==0:
+                    S+= single_gauss(x, x0, sigma_el) * G_poisson(0,ll,xt)
+                else:
+                    xn =  n * g
+                    _sigma_n = sigma_n(n, sigma_pe, sigma_el)
+                    
+                    S += (
+                         G_poisson(n,ll,xt)* 
+                         single_gauss(x, xn, _sigma_n)
+                         )
 
             return  S 
         
         return spe_spectrum_function_(x, ll, xt, g, x0, sigma_pe, sigma_el) * self.tot_evts* self.binwidth
     
+    ##############################################
+    ##############################################
+    ##############################################
+   
+    def spe_spectrum_function_sss(self,x, ll, xt, g, sigma_pe, sigma_el,x_el):
+        """
+        single phot-electron spectrum fuction x -> MES(x) 
+
+        Parameters
+        ----------
+        x: integer
+            ADC counts
+        ll: float
+            Expected value of the poisson law (avergae thermal photon number in 60ns)
+        xt : float
+            Cross talk probability
+        g: float
+            gain : Averaged number of ADC counts produced by one photo-electron
+        sigma_pe: float
+            st.d. of the ADC counts produced by one photo-electron
+        sigma_el: float
+            st.d. of the ADC counts produced by the electronic noise
+        """
+        
+        STP = np.sqrt(2 * np.pi)
+
+        true_Ext = 1/(1-xt) - ll /self.n_sample * self.peak_search_window_width
+        x00 = -ll * g / self.n_sample * self.peak_search_window_width * true_Ext
+
+        
+        def single_gauss(x, xn, sigma_n):
+            return np.exp(-1/2 *((x-xn)/sigma_n)**2) / (sigma_n * STP)
+        
+        def sigma_n(n, sigma_pe, sigma_el):
+            return np.sqrt(n * sigma_pe**2 + sigma_el**2)
+        def G_poisson(n,theta,l_lambda): ## not folowing notation from On the Generalized Poisson Distribution (2006) lambda = muXT!
+            a1 = theta*(theta + n*l_lambda)**(n-1) / scsp.factorial(n)
+            a2 = np.exp(-theta - n*l_lambda)
+            return a1*a2
+
+        def borel(k,m): 
+            return np.exp(-m*k)*(m*k)**(k-1) / scsp.factorial(k)
+            
+
+        
+        def spe_spectrum_function_(x, ll, xt, g, x_el, sigma_pe, sigma_el):
     
+            S = np.zeros_like(x)
+            for n in range(0, 8):
+                if n==0:
+                    S+= single_gauss(x, x_el, sigma_el) * scst.poisson(ll).pmf(0)
+                else:
+                    xn =  x00 + n * g
+                    _sigma_n = sigma_n(n, sigma_pe, sigma_el)
+                    if True:
+                        S += (borel(n,xt)*
+                              (1-scst.poisson(ll).pmf(0))*
+                              single_gauss(x, xn, _sigma_n)
+                              )
+                    if False:
+                        S += (
+                            G_poisson(n,ll,xt)* 
+                            single_gauss(x, xn, _sigma_n)
+                            )
+
+            return  S 
+        
+        return spe_spectrum_function_(x, ll, xt, g, x_el, sigma_pe, sigma_el) * self.tot_evts* self.binwidth    
+    
+    ##############################################
+
+    ##############################################
+    ##############################################
+    ##############################################
+   
+    def spe_spectrum_function(self,x, ll, xt, g, sigma_pe, sigma_el,x_el):
+        """
+        single phot-electron spectrum fuction x -> MES(x) 
+
+        Parameters
+        ----------
+        x: integer
+            ADC counts
+        ll: float
+            Expected value of the poisson law (avergae thermal photon number in 60ns)
+        xt : float
+            Cross talk probability
+        g: float
+            gain : Averaged number of ADC counts produced by one photo-electron
+        sigma_pe: float
+            st.d. of the ADC counts produced by one photo-electron
+        sigma_el: float
+            st.d. of the ADC counts produced by the electronic noise
+        """
+        
+        STP = np.sqrt(2 * np.pi)
+
+        #true_Ext = 1/(1-xt) - ll /self.n_sample * self.peak_search_window_width
+        x00 = -ll * g / self.n_sample * self.peak_search_window_width * 1/(1-xt)
+        ## TNT
+        ##x_el = sigma_el*2.17 ??
+        
+        def single_gauss(x, xn, sigma_n):
+            return np.exp(-1/2 *((x-xn)/sigma_n)**2) / (sigma_n * STP)
+        
+        def sigma_n(n, sigma_pe, sigma_el):
+            return np.sqrt(n * sigma_pe**2 + sigma_el**2)
+
+        def G_poisson(n,theta,l_lambda): ##  folowing notation from On the Generalized Poisson Distribution (2006) lambda = muXT!
+            a1 = theta*(theta + n*l_lambda)**(n-1) / scsp.factorial(n)
+            a2 = np.exp(-theta - n*l_lambda)
+            return a1*a2
+
+        def borel(k,m): 
+            return np.exp(-m*k)*(m*k)**(k-1) / scsp.factorial(k)
+            
+
+        
+        def spe_spectrum_function_(x, ll, xt, g, x_el, sigma_pe, sigma_el):
+            poissonratio= (1-np.exp(-ll))/(1-np.exp(-ll/self.n_sample * self.peak_search_window_width))
+            S = np.zeros_like(x)
+            for n in range(0, 8):
+                if n==0:
+                    S+= single_gauss(x, x_el, sigma_el) * scst.poisson(ll).pmf(0)
+                else:
+                    xn =  x00 + n * g
+                    _sigma_n = sigma_n(n, sigma_pe, sigma_el)
+                    if False:
+                        S += (borel(n,xt)*
+                              (1-scst.poisson(ll).pmf(0))*
+                              single_gauss(x, xn, _sigma_n)
+                              )
+                    if True:
+                        S += (
+                            G_poisson(n,ll/ self.n_sample * self.peak_search_window_width,xt)*
+                            poissonratio*
+                            single_gauss(x, xn, _sigma_n)
+                            )
+
+            return  S 
+        
+        return spe_spectrum_function_(x, ll, xt, g, x_el, sigma_pe, sigma_el) * self.tot_evts* self.binwidth    
     
     ##############################################
     def plot_failed_pixs(self):
@@ -314,8 +489,9 @@ class mes_fitter:
                        g       ,
                        sigma_pe,
                        sigma_el,
+                       x_el
                        ):
-            preds = self.spe_spectrum_function(X,l,xt,g,sigma_pe,sigma_el)
+            preds = self.spe_spectrum_function(X,l,xt,g,sigma_pe,sigma_el,x_el)
             # l =  np.sum( [np.log(scipy.stats.poisson(preds[ii]).pmf(Y[ii])) for ii in range(len(Y)) ] )
             if ((preds>0).all()) & (np.isreal(preds).all()):
                 l =  np.sum( np.log(preds)*Y-preds-scipy.special.gammaln(Y+1) )
@@ -327,95 +503,94 @@ class mes_fitter:
                    l        = .2,      # lambda
                    xt       = 0.11,      # X-talk
                    g        = g0,       # g
-                   sigma_pe = 3.1,      # sigma_pe
+                   sigma_pe = 2 ,      # sigma_pe
                    sigma_el = 4.,       # sigma_el
+                   x_el = 0,
                    # throw_nan=True
                    )
         #m.fixed['sigma_pe']=True
-        #m.fixed['x0']=False
+        #m.fixed['x_el']=False
 
         ## new version of Minuit :
-        m.limits['l']  = (1e-5,0.6)
-        m.limits['xt']  = (1e-5,0.3)
-        m.limits['g']  = (0,40)
-        m.limits['sigma_pe'] = (0,6)
-        m.limits['sigma_el'] = (0,20)
+        if True:
+            m.limits['l']  = (0,2)
+            m.limits['xt']  = (1e-5,0.4)
+            m.limits['g']  = (0,40)
+            m.limits['sigma_pe'] = (1,10)
+            m.limits['sigma_el'] = (0,20)
         m.errordef=0.5   ### 0.5 for likelihood, 1 for LS
         m.migrad()
         m.hesse()
 
         
-        param_names = [ 'dcr','X_talk', 'gain', 'sigma_pe', 'sigma_el']
+        
 
 
         
         # if m.accurate:
-        #     result = dict(zip(param_names, m.np_values() ))
-        #     result['P_chi2'] = (((Y - self.spe_spectrum_function(X, *m.np_values())) / Yerr )**2).sum() / (len(X) - len(param_names))
+        #     result = dict(zip(self.param_names, m.np_values() ))
+        #     result['P_chi2'] = (((Y - self.spe_spectrum_function(X, *m.np_values())) / Yerr )**2).sum() / (len(X) - len(self.param_names))
         # else:
         #     print('fit_failed')
-        #     result = dict(zip(param_names, [-1,-1,-1,-1,-1]))
+        #     result = dict(zip(self.param_names, [-1,-1,-1,-1,-1]))
         #     result['P_chi2'] = 100
         
 
-        result = dict(zip(param_names, m.values ))
+        result = dict()
+        result['pixel_id']     = pix
+        for ii, param in enumerate(self.param_names):
+            result[param]        = m.values[ii]
+            result[param+'_err'] = m.errors[m.parameters[ii]]
         ## reduced Chi2
-        result['P_chi2'] = (((Y - self.spe_spectrum_function(X, *np.array(m.values) )) / Yerr )**2).sum() / (len(X) - len(param_names))
+        result['P_chi2'] = (((Y - self.spe_spectrum_function(X, *np.array(m.values) )) / Yerr )**2).sum() / (len(X) - len(self.param_names))
+
+
+
+        true_Ext = 1/(1-result["X_talk"]) - result["dcr"]/self.n_sample * self.peak_search_window_width
+
+        
+        
+        
+        
+        result['dcr_MHz']      = (m.values['l']*5) # MHz
+        result['true_Xtalk']   = 1-1/true_Ext
+        result['fit_accuracy'] = m.accurate
+        result['dc_to_pe']     = result['gain']*1/(1-result["true_Xtalk"])
+        result['x0']           = -result['dcr'] * result['dc_to_pe']/ self.n_sample * self.peak_search_window_width
 
         conf_limits = dict()
-        conf_limits['dcr']      = [1e-5,0.6]
-        conf_limits['X_talk']   = [0.05,0.15]
-        conf_limits['gain']     = [15,25]
+        conf_limits['dcr']      = [0,1.5]
+        conf_limits['X_talk']   = [0.,0.3]
+        conf_limits['gain']     = [16,35]
         conf_limits['sigma_pe'] = [1,5.5]
         conf_limits['sigma_el'] = [0,7]
-        conf_limits['P_chi2']   = [0,3]
+        conf_limits['P_chi2']   = [0,15]
+        conf_limits['true_Xtalk']   = [0.05,0.25]
 
         ## estimate the validity of fitted parameter 
         ## (pixels with important electronic noise lead to degenerated shapes)
-        calib_flag = 1
+        calib_flag = int(m.accurate)
         for key in conf_limits.keys():
             if result[key]<conf_limits[key][0] or result[key]>conf_limits[key][1]:
                 calib_flag = 0
+        result['calib_flag']   = calib_flag
 
-        if calib_flag == 0:
-            print("Could'nt properly calibrate pixel {} -- retrying with some parameter fixed".format(pix) )
-            m.reset()
-            m.fixed['xt']=True
-            m.fixed['sigma_pe']=True
-            m.migrad()
-            result = dict(zip(param_names, m.values ))
-            result['P_chi2'] = (((Y - self.spe_spectrum_function(X, *np.array(m.values) )) / Yerr )**2).sum() / (len(X) - len(param_names))
-            calib_flag = 0.5
-            for key in conf_limits.keys():
-                if result[key]<conf_limits[key][0] or result[key]>conf_limits[key][1]:
-                    calib_flag = 0
-
-        result['dc_to_pe'] = result['gain']/(1-result['X_talk'])
-        result['pixel_id'] = pix
-        #result['x0'] = -result['dcr'] * result['dc_to_pe']
-        result['calib_flag'] = calib_flag
         self.minuit = m ## will not be filled in pool mp
         return result
 
     ##############################################
 
     def do_all_fit(self,n_proc=1):
-        results = dict({ 'pixel_id'   : [],
-                         'dcr'        : [],
-                         'X_talk'     : [],
-                         'gain'       : [],
-                         #'x0'         : [],
-                         'sigma_pe'   : [],
-                         'sigma_el'   : [],
-                         'P_chi2'     : [],
-                         'dc_to_pe'   : [],
-                         'calib_flag' : []})
-        
+
         centers_adcsum,Qsum_hist,centers_adcmax,Qmax_hist = self.get_histograms()
         pool = mp.Pool(n_proc)
         pool_results = pool.map(self.aspe_fit, 
                                 self.pixels,
-                            )
+                                )
+        results = dict()
+        for key in pool_results[0].keys():
+            results[key] = []
+
         for result in pool_results:
             for key in result.keys():
                     results[key].append(result[key])
@@ -433,7 +608,7 @@ class mes_fitter:
     ##############################################
 
     
-    def plot_cam_dist(self,save_plots=False):
+    def plot_cam_dist(self,save_plots=False,nan_failed=False):
         
         for key in self.results.keys():
             try:
@@ -441,10 +616,12 @@ class mes_fitter:
                 disp = CameraDisplay(self.geom,ax=ax)
                 disp.add_colorbar()
                 image = self.res[key].copy()
-                # image[self.res['P_chi2']>10] = self.res[key].min()
+                if nan_failed:
+                    image[self.res['calib_flag']==0] = np.nan
                 disp.image = image
                 ax.set_title(key+" Tel {}".format(self.tel))
-                disp.set_limits_percent(95)
+                #disp.set_limits_percent(95)
+                disp.set_limits_minmax(image.min()*0.95,image.max()*1.05)
                 if save_plots:
                     f.savefig(self.plot_dir+'cam_{}_tel{}.png'.format(key,self.data_path[-2]))
             except:
@@ -457,9 +634,9 @@ class mes_fitter:
         
         # fitlabel = 'fit : \n gain : {:.2} \n Xt : {:.2}'.format(result['gain'],
         #                                                         result['B_param'])
-        fitlabel = 'fit : '
-        for key in list(result.keys())[:-2]:
-            fitlabel=fitlabel+'{}    ::   {:.3} \n'.format(key,result[key])
+        fitlabel = 'fit : \n'
+        for key in self.param_names:
+            fitlabel=fitlabel+'{}    ::   {:.3} $\pm {:.2}$ \n'.format(key,result[key],result[key+'_err'])
         fitlabel = fitlabel+' Calib Flag :: {}'.format(result["calib_flag"])
         print(self.res.iloc[pix])
         f,ax = plt.subplots(figsize=(12,5))
@@ -472,21 +649,20 @@ class mes_fitter:
                         label='$\sum$ ADC - baseline')
         
         ax.plot(self.centers_adcsum,self.spe_spectrum_function(self.centers_adcsum,
-                                                            *list(result.values())[1:6]),
+                                                            *[result[k] for k in self.param_names]),
                                                             '--',
                                                             color='black',
                                                             label= fitlabel)
         
-        def single_gauss(x,l,x0,p,sigma_el):
-            return np.exp(-1/2 *((x-x0)/sigma_el)**2) / (sigma_el * np.sqrt(2 * np.pi) -p) *scst.poisson(l).pmf(0)
+        def single_gauss(x,A,x0,sigma_el):
+            return np.exp(-1/2 *((x-x0)/sigma_el)**2) / (sigma_el * np.sqrt(2 * np.pi)) *A
         
-        A = self.tot_evts* self.binwidth
+
         ax.plot(self.centers_adcsum,
                 single_gauss(self.centers_adcsum,
-                            A,
-                            -result['dcr'] * result['dc_to_pe'],
-                            result['dcr'],
-                            result['sigma_el']),
+                             self.tot_evts* np.exp(-result['dcr']),
+                             result['x_el'],
+                             result['sigma_el']),
                 ':',
                 label='pedestal')
         
