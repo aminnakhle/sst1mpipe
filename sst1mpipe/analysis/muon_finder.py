@@ -44,7 +44,7 @@ DEFAULT_CONFIG_FILE = pkg_resources.resource_filename(
                             )
                         )
 DEFAULT_CONFIG = load_config(DEFAULT_CONFIG_FILE, ismc=False)
-def swap_modules_59_88(event, tel=None):
+def swap_r0_modules_59_88(event, tel=None):
 
     # module 59
     mask59 = np.zeros(1296, dtype=bool)
@@ -256,7 +256,7 @@ class muon_finder:
                     
                     print("night : "+night_datestr)
                 if (tel==22) and (start_date<datetime.datetime(2024,7,18)):
-                    event = swap_modules_59_88(event, tel=tel)
+                    event = swap_r0_modules_59_88(event, tel=tel)
                     #pass
                 r0data = event.sst1m.r0.tel[tel]                    
     
