@@ -4,7 +4,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    version="0.8.0",
+    version="0.8.0-dev",
     packages=find_packages(),
     install_requires=[
         'h5py',
