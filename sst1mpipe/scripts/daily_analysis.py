@@ -422,14 +422,13 @@ def run_daily_ana(daily_config):
             stereo_dl3_dir_eff = os.path.join(stereo_dir,'dl3_eff')
             Path(stereo_dl3_dir_eff).mkdir(exist_ok=True)
 
-            stereo_dqual_dir_eff = os.path.join(stereo_dir,'distributions')
+            stereo_dqual_dir_eff = os.path.join(stereo_dir,'distributions_eff')
             Path(stereo_dqual_dir_eff).mkdir(exist_ok=True)
         ## R0 -> DL1
         # cs1
         aargs = iargs()
         
         aargs.config_file = config_file
-        aargs.gammaness_cut_dir = None
         if cs1 and (target in list(dict_list_t1.keys()) ) and run_dl1:
             aargs.out_dir     = cs1_dl1_dir
             
@@ -472,6 +471,7 @@ def run_daily_ana(daily_config):
                     aargs.target_ra = target_pos.ra.to_value(u.deg)
                     aargs.target_dec = target_pos.dec.to_value(u.deg)
                     aargs.irf_dir = daily_config["irf_dir"]
+                    aargs.gammaness_cut_dir = None
                     dl2_dl3_1dir(aargs)
                 except:
                     logging.error("CS1 : DL2 > DL3 failed")
@@ -509,6 +509,7 @@ def run_daily_ana(daily_config):
                     aargs.target_ra = target_pos.ra.to_value(u.deg)
                     aargs.target_dec = target_pos.dec.to_value(u.deg)
                     aargs.irf_dir = daily_config["irf_dir"]
+                    aargs.gammaness_cut_dir = None
                     dl2_dl3_1dir(aargs)
                 except:
                     logging.error("CS2 : DL2 > DL3 failed")
@@ -555,6 +556,7 @@ def run_daily_ana(daily_config):
                     aargs.target_ra   = target_pos.ra.to_value(u.deg)
                     aargs.target_dec  = target_pos.dec.to_value(u.deg)
                     aargs.irf_dir     = daily_config["irf_dir"]
+                    aargs.gammaness_cut_dir = None
                     dl2_dl3_1dir(aargs)
                 except:
                     logging.error("STEREO : DL2 > DL3 failed")
