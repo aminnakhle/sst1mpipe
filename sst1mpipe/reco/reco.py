@@ -570,7 +570,13 @@ def apply_models(
                                                     times=times)
 
         dl2['reco_alt'] = src_pos_reco.alt.deg
-        dl2['reco_az'] = src_pos_reco.az.deg
+        azimuth_transformed = (src_pos_reco.az.to_value(u.deg) +  180) % 360 - 180
+        if abs(dl2['true_az_tel'][0]) <= 90:
+            dl2['reco_az'] = azimuth_transformed
+            logging.info('Using transformed azimuth')
+        else:
+            dl2['reco_az'] = src_pos_reco.az.deg
+            logging.info('Using non-transformed azimuth')
 
         radec = src_pos_reco.transform_to('icrs')
         dl2['reco_ra'] = radec.ra.deg
@@ -661,7 +667,12 @@ def stereo_reconstruction(
             
             azimuth_transformed = (src_pos_reco.az.to_value(u.deg) + 180) % 360 - 180            
             params.loc[mask, 'reco_alt'+sign.replace('reco_disp','')] = src_pos_reco.alt.deg
-            params.loc[mask, 'reco_az'+sign.replace('reco_disp','')] = azimuth_transformed
+            if abs(params[mask].true_az_tel.values[0]) <= 90:
+                params.loc[mask, 'reco_az'+sign.replace('reco_disp','')] = azimuth_transformed
+                logging.info('Using transformed azimuth')
+            else:
+                params.loc[mask, 'reco_az'+sign.replace('reco_disp','')] = src_pos_reco.az.deg
+                logging.info('Using non-transformed azimuth')
 
     # Now we have in params two azimuths and altitudes for each telescope, generated 
     # using either + or - sign togther with the reconstructd disp_norm. We now need 
