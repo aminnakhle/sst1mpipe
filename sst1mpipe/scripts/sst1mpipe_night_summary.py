@@ -288,7 +288,7 @@ def main():
         fig8, ax8 = plt.subplots(1, 2, figsize=(12, 5)) # cogs, dl1 mono, survived cleaning
         fig9, ax9 = plt.subplots(1, 2, figsize=(12, 5)) # cogs, dl2 mono, photons
         fig10, ax10 = plt.subplots(1, 2, figsize=(12, 5)) # DL1 stereo, survived cleaning
-        fig11, ax11 = plt.subplots(1, 1, figsize=(6, 5)) # Moon
+        fig11, ax11 = plt.subplots(1, 1, figsize=(12, 5)) # Moon
         fig12, ax12 = plt.subplots(1, 2, figsize=(12, 5)) # stereo dt
         fig13, ax13 = plt.subplots(1, 3, figsize=(16, 5)) # theta2 plots
 
@@ -296,6 +296,7 @@ def main():
         median2 = []
         t_diff_all = []
         times_all = []
+        moon_done = False
 
         rate_colors = {'tel_021':'blue', 'tel_022':'orange', 'stereo':'green'}
 
@@ -520,7 +521,7 @@ def main():
                         zenith_time.append(np.array(zenith.T))
 
                     # moon
-                    if (tel == 'tel_021') and (len(dl2) > 0):
+                    if (not moon_done) and (len(dl2) > 0):
                         time, moon_altaz, moon_separation, moon_phase_angle = get_moon_params(dl2, config=config, tel=tel, thinning=100)
                         time_all.append(np.array(time.unix))
                         moon_altaz_all.append(np.array(moon_altaz.alt.to_value(u.deg)))
@@ -556,7 +557,7 @@ def main():
                     local_time = np.concatenate(local_time)
                     zenith_time = np.concatenate(zenith_time)
                     ax7[1].plot(local_time, zenith_time, '.', label=tel, alpha=0.7)
-                if tel == 'tel_021':
+                if not moon_done:
                     if len(dl2) > 0:
                         time, moon_altaz, moon_separation, moon_phase_angle = get_moon_params(dl2, config=config, tel=tel, thinning=100)
                         time_all.append(np.array(time.unix))
@@ -567,6 +568,7 @@ def main():
                     ax11.plot(np.concatenate(time_all), np.concatenate(moon_altaz_all), label='Moon alt')
                     ax11.plot(np.concatenate(time_all), np.concatenate(moon_separation_all), label='Moon sep')
                     ax11.plot(np.concatenate(time_all), np.concatenate(moon_phase_angle_all), label='Moon phase (full=0)')
+                    moon_done = True
 
                 # CoGs - DL2 mono, gammas
                 X, Y = np.meshgrid(xedges, yedges)
@@ -662,21 +664,34 @@ def main():
             # PLOTTING
 
             # Distributions
+            ax4[0].set_title('Differential rates of DL1 events (per wobble)')
+            ax4[0].set_ylabel('Differential rate')
+            ax4[0].set_xlabel('Hillas Intensity [p.e.]')
+            ax4[1].set_xlabel('livetime [s]')
+            ax4[1].set_title('Livetime of each wobble')
+
+            ax5[0].set_title('Differential rates of DL1 events (per wobble)')
+            ax5[0].set_ylabel('Differential rate')
+            ax5[0].set_xlabel('Hillas Intensity [p.e.]')
+            ax5[1].set_xlabel('livetime [s]')
+            ax5[1].set_title('Livetime of each wobble')
+
+            ax6[0].set_title('Differential rates of DL1 events (per wobble)')
+            ax6[0].set_ylabel('Differential rate')
+            ax6[0].set_xlabel('Hillas Intensity [p.e.]')
+            ax6[1].set_xlabel('livetime [s]')
+            ax6[1].set_title('Livetime of each wobble')
+
             if is_dist and (tt==21):
                 p = ax4[0].plot(bins[:-1], histograms_diff.T, alpha=0.5)
                 ax4[0].set_xscale('log')
                 ax4[0].set_yscale('log')
                 ax4[0].axvline(50)
-                ax4[0].set_ylabel('Differential rate')
-                ax4[0].set_xlabel('Hillas Intensity [p.e.]')
                 ax4[0].set_xlim([10, 10**5])
                 ax4[0].grid()
-                ax4[0].set_title('Differential rates of DL1 events (per wobble)')
 
                 h = ax4[1].hist(livetimes, bins=20)
                 ax4[1].grid()
-                ax4[1].set_xlabel('livetime [s]')
-                ax4[1].set_title('Livetime of each wobble')
                 fig4.suptitle(tel, fontsize=16)
 
             if is_dist and (tt==22):
@@ -684,16 +699,11 @@ def main():
                 ax5[0].set_xscale('log')
                 ax5[0].set_yscale('log')
                 ax5[0].axvline(50)
-                ax5[0].set_ylabel('Differential rate')
-                ax5[0].set_xlabel('Hillas Intensity [p.e.]')
                 ax5[0].set_xlim([10, 10**5])
                 ax5[0].grid()
-                ax5[0].set_title('Differential rates of DL1 events (per wobble)')
 
                 h = ax5[1].hist(livetimes, bins=20)
                 ax5[1].grid()
-                ax5[1].set_xlabel('livetime [s]')
-                ax5[1].set_title('Livetime of each wobble')
                 fig5.suptitle(tel, fontsize=16)
 
             if is_dist and (tt==0):
@@ -701,28 +711,24 @@ def main():
                 ax6[0].set_xscale('log')
                 ax6[0].set_yscale('log')
                 ax6[0].axvline(50)
-                ax6[0].set_ylabel('Differential rate')
-                ax6[0].set_xlabel('Hillas Intensity [p.e.]')
                 ax6[0].set_xlim([10, 10**5])
                 ax6[0].grid()
-                ax6[0].set_title('Differential rates of DL1 events (per wobble)')
 
                 h = ax6[1].hist(livetimes, bins=20)
                 ax6[1].grid()
-                ax6[1].set_xlabel('livetime [s]')
-                ax6[1].set_title('Livetime of each wobble')
                 fig6.suptitle(tel, fontsize=16)
 
             # Zenith angles
+            fig7.suptitle("Distribution of zenith angles", fontsize=16)
+            ax7[0].set_xlabel('zenith [deg]')
+            ax7[0].set_ylabel('N reconstructed events')
+            ax7[1].set_xlabel('local_time [s]')
+            ax7[1].set_ylabel('zenith [deg]')
+
             if is_dl2 and (tel != "stereo"):
-                fig7.suptitle("Distribution of zenith angles", fontsize=16)
-                ax7[0].set_xlabel('zenith [deg]')
                 ax7[0].grid()
-                ax7[0].set_ylabel('N reconstructed events')
                 ax7[0].grid()
                 ax7[0].legend()
-                ax7[1].set_xlabel('local_time [s]')
-                ax7[1].set_ylabel('zenith [deg]')
                 ax7[1].grid()
                 ax7[1].invert_yaxis()
                 ax7[1].legend()
@@ -744,79 +750,85 @@ def main():
                 ax9[1].set_title(tel)
 
             # DL1 stereo, survived cleaning
+            fig10.suptitle("CoG of DL1 stereo events", fontsize=16)
+            fig12.suptitle("Time differences between stereo events", fontsize=16)
+            ax10[0].set_title('tel1')
+            ax10[1].set_title('tel2')
+            ax12[0].set_xlabel('DT [ns]')
+            ax12[1].set_xlabel('local time [s]')
+            ax12[1].set_ylabel('DT [ns]')
             if is_dl1 and (tt == 0):
-                fig10.suptitle("CoG of DL1 stereo events", fontsize=16)
-                ax10[0].set_title('tel1')
-                ax10[1].set_title('tel2')
                 # WR dt
-                fig12.suptitle("Time differences between stereo events", fontsize=16)
-                ax12[0].set_xlabel('DT [ns]')
                 ax12[0].set_xlim([-1200, 1200])
                 ax12[0].grid()
                 ax12[0].set_yscale('log')
                 ax12[1].set_ylim([-1200, 1200])
-                ax12[1].set_xlabel('local time [s]')
-                ax12[1].set_ylabel('DT [ns]')
 
             # Moon
-            if is_dl2 and (tt == 21):
+            ax11.set_title('Moon')  
+            ax11.set_ylabel('deg')
+            ax11.set_xlabel('Time [UTC]')
+            if is_dl2:
+                new_times = []
+                for i in range(len(ax11.get_xticklabels())):
+                    time_unix = ax11.get_xticklabels()[i].get_position()[0]
+                    new_times.append(Time(time_unix, format='unix', scale='utc').isot.split('T')[1].split('.')[0])
+                ax11.set_xticks(ax11.get_xticks())
+                t = ax11.set_xticklabels(new_times) #, rotation='vertical')
                 ax11.grid()
-                ax11.set_ylabel('deg')
-                ax11.set_xlabel('local_time [s]')
                 ax11.legend()
-                ax11.set_title('Moon')  
-
-
-        # changing tick labels to UTC time
-        if is_dl1:
-            new_times = []
-            for i in range(len(ax.get_xticklabels())):
-                time_unix = ax.get_xticklabels()[i].get_position()[0]
-                new_times.append(Time(time_unix, format='unix', scale='utc').isot.split('T')[1].split('.')[0])
-            ax.set_xticks(ax.get_xticks())
-            t = ax.set_xticklabels(new_times) #, rotation='vertical')
+                
+            # changing tick labels to UTC time
+            ax.set_title('DL1 events (survived cleaning)', fontsize=16)
             ax.set_xlabel('Time [UTC]')
             ax.set_ylabel('Trigger rate [Hz]')
-            ax.grid()
-            ax.legend()
-            ax.set_title('DL1 events (survived cleaning)', fontsize=16)
-        
-        # changing tick labels to UTC time
-        if is_dl1:
-            new_times = []
-            for i in range(len(ax1.get_xticklabels())):
-                time_unix = ax1.get_xticklabels()[i].get_position()[0]
-                new_times.append(Time(time_unix, format='unix', scale='utc').isot.split('T')[1].split('.')[0])
-            ax1.set_xticks(ax1.get_xticks())
-            t = ax1.set_xticklabels(new_times) #, rotation='vertical')
+            if is_dl1:
+                new_times = []
+                for i in range(len(ax.get_xticklabels())):
+                    time_unix = ax.get_xticklabels()[i].get_position()[0]
+                    new_times.append(Time(time_unix, format='unix', scale='utc').isot.split('T')[1].split('.')[0])
+                ax.set_xticks(ax.get_xticks())
+                t = ax.set_xticklabels(new_times) #, rotation='vertical')
+                ax.grid()
+                ax.legend()
+
+            # changing tick labels to UTC time
+            ax1.set_title('DL1 events (zoom)', fontsize=16)
             ax1.set_xlabel('Time [UTC]')
             ax1.set_ylabel('Trigger rate [Hz]')
-            ax1.grid()
-            ax1.legend()
-            ax1.set_ylim([0, 2*max(median1)])
-            ax1.set_title('DL1 events (zoom)', fontsize=16)
+            if is_dl1:
+                new_times = []
+                for i in range(len(ax1.get_xticklabels())):
+                    time_unix = ax1.get_xticklabels()[i].get_position()[0]
+                    new_times.append(Time(time_unix, format='unix', scale='utc').isot.split('T')[1].split('.')[0])
+                ax1.set_xticks(ax1.get_xticks())
+                t = ax1.set_xticklabels(new_times) #, rotation='vertical')
+                ax1.grid()
+                ax1.legend()
+                ax1.set_ylim([0, 2*max(median1)])
+                
 
-        # changing tick labels to UTC time
-        if is_dl2:
-            new_times = []
-            for i in range(len(ax2.get_xticklabels())):
-                time_unix = ax2.get_xticklabels()[i].get_position()[0]
-                new_times.append(Time(time_unix, format='unix', scale='utc').isot.split('T')[1].split('.')[0])
-            ax2.set_xticks(ax2.get_xticks())
-            t = ax2.set_xticklabels(new_times) #, rotation='vertical')
+            # changing tick labels to UTC time
+            ax2.set_title('DL2 events', fontsize=16)
             ax2.set_xlabel('Time [UTC]')
             ax2.set_ylabel('Event rate [Hz]')
-            ax2.set_ylim([0, 2*max(median2)])
-            ax2.grid()
-            ax2.legend()
-            ax2.set_title('DL2 events', fontsize=16)
+            if is_dl2:
+                new_times = []
+                for i in range(len(ax2.get_xticklabels())):
+                    time_unix = ax2.get_xticklabels()[i].get_position()[0]
+                    new_times.append(Time(time_unix, format='unix', scale='utc').isot.split('T')[1].split('.')[0])
+                ax2.set_xticks(ax2.get_xticks())
+                t = ax2.set_xticklabels(new_times) #, rotation='vertical')
+                ax2.set_ylim([0, 2*max(median2)])
+                ax2.grid()
+                ax2.legend()
 
-        if is_dl1:
-            ax3.grid()
-            ax3.legend()
             ax3.set_xlabel('Time [UTC]')
             ax3.set_ylabel('NSB rate [MHz]')
             ax3.set_title("Night Sky Background", fontsize=16)
+            if is_dl1:
+                ax3.grid()
+                ax3.legend()
     
         logging.info('All done, saving figures in temporary png files.')
         fig.savefig(outpath+'/trigger_rates.png', dpi=250)
