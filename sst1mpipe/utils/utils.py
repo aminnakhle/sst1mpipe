@@ -681,6 +681,8 @@ def energy_min_cut(file, config=None):
         min_energy = config["analysis"]["gamma_min_simulated_energy_tev"] 
     elif particle_type == 101:
         min_energy = config["analysis"]["proton_min_simulated_energy_tev"]
+    else:
+        min_energy = config["analysis"]["proton_min_simulated_energy_tev"]
 
     telescopes = get_telescopes(file)
 
