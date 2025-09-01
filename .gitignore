@@ -11,4 +11,4 @@ sst1mpipe/source_simulation/dl2_gamma/
 sst1mpipe/source_simulation/fits_files/
 sst1mpipe/source_simulation/lst_data/
 # Ignore specific notebook
-sst1mpipe/source_simulation/notebooks/LST1_observation_simulator.ipynb
+LST1_observation_simulator.ipynb
