@@ -507,7 +507,15 @@ def angular_resolution(
             hist1 = axes[0, 0].hist2d(dl2_gamma['reco_az'], dl2_gamma['reco_alt'], bins=50, norm=mpl.colors.LogNorm())
             axes[0, 0].set_xlabel('az [deg]')
             axes[0, 0].set_ylabel('alt [deg]')
-            axes[0, 0].set_xlim(dl2_gamma['true_az'].iloc[0]-5/np.cos(np.deg2rad(dl2_gamma['true_alt'].iloc[0])), dl2_gamma['true_az'].iloc[0]+5/np.cos(np.deg2rad(dl2_gamma['true_alt'].iloc[0])))
+
+            dl2_gamma_azimuth_transformed = (dl2_gamma['true_az'] +  180) % 360 - 180
+            if abs(dl2_gamma['true_az_tel'].iloc[0]) <= 90:
+                logging.info('Using transformed azimuth to plot angular resolution.')
+                axes[0, 0].set_xlim(dl2_gamma_azimuth_transformed.iloc[0]-5/np.cos(np.deg2rad(dl2_gamma['true_alt'].iloc[0])), dl2_gamma_azimuth_transformed.iloc[0]+5/np.cos(np.deg2rad(dl2_gamma['true_alt'].iloc[0])))
+            else:
+                logging.info('Using non-transformed azimuth to plot angular resolution.')
+                axes[0, 0].set_xlim(dl2_gamma['true_az'].iloc[0]-5/np.cos(np.deg2rad(dl2_gamma['true_alt'].iloc[0])), dl2_gamma['true_az'].iloc[0]+5/np.cos(np.deg2rad(dl2_gamma['true_alt'].iloc[0])))
+
             axes[0, 0].set_ylim(dl2_gamma['true_alt'].iloc[0]-5, dl2_gamma['true_alt'].iloc[0]+5)
         elif not axes_sky and 'reco_src_x' in dl2_gamma.keys():
             hist1 = axes[0, 0].hist2d(dl2_gamma['reco_src_x'], dl2_gamma['reco_src_y'], bins=50, range=np.array([(-1, 1), (-1, 1)]), norm=mpl.colors.LogNorm())

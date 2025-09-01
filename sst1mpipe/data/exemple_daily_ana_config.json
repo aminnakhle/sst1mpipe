@@ -1,17 +1,28 @@
 {
-    "n_proc" : 15,
-    "config_file" :"/data/work/analysis/Daily_analysis/default_sst1mpipe_data_config_analysis.json",
-    "year" : 2023,
-    "month":10,
-    "day"  :11,
+    "n_proc" : 30,
+    "config_file" :"/data/work/tavernier/daily_ana/sst1mpipe_data_config07.json",
+    "year" : 2025,
+    "month":5,
+    "day"  :1,
     "cs1"   : true,
     "cs2"   : true,
     "stereo": true,
 
-    "root_dir" : "/net/",
-    "ana_dir" : "/data/work/analysis/Daily_analysis/",
-    "irf_dir": "/data/work/analysis/IRFs/",
-    "mono_model_dir":"/data/work/analysis/MC/prod_january_2023/v0.2.0/models_mono_psf_vaod0.2/",
-    "stereo_model_dir":"/data/work/analysis/MC/prod_january_2023/v0.2.0/models_stereo_psf_vaod0.2/"
+    "run_dl1": false,
+    "run_dl2": false,
+    "run_dl3": false,
+    "run_data_qual": false,
+
+    "run_dl3_eff"        : true,
+    "run_data_qual_eff"  : true,
+    "eff_cut_dir_mono"   : "/data/work/analysis/MC/prod_oct_2024_84/v0.7.2/edep_cuts_eff05_mono_med4/",
+    "eff_cut_dir_stereo" : "/data/work/analysis/MC/prod_oct_2024_84/v0.7.2/edep_cuts_eff05_stereo_med4/",
+
+    "root_dir" : "/net",
+    "ana_dir": "/data2/work/tavernier/daily_ana/data_test/",
+    "irf_dir" : "/data/work/tavernier/nsb_mon/farm_dir2/IRFs/",
+    "mono_model_dir":"/data/work/analysis/MC/prod_oct_2024_84/v0.7.2/models_mono/",
+    "stereo_model_dir":"/data/work/analysis/MC/prod_oct_2024_84/v0.7.2/models_stereo/"
 }
+
 
