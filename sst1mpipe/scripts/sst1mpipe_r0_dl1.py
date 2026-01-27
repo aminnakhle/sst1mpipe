@@ -32,9 +32,9 @@ from sst1mpipe.utils import (
     get_location,
     get_subarray,
     image_cleaner_setup,
-    swap_modules_59_88,
+    get_swaped_modules,
+    swap_modules_r0wf,    
     VAR_to_Idrop,
-    get_swap_flag
 )
 from sst1mpipe.utils.monitoring_pedestals import sliding_pedestals
 from sst1mpipe.utils.monitoring_r0_dl1 import Monitoring_R0_DL1
@@ -311,7 +311,7 @@ def main():
                         )
                     tel_string = get_tel_string(tel, mc=False)
                     location = get_location(config=config, tel=tel_string)
-                    swap_modules = get_swap_flag(event)
+                    swaped_modules_list = get_swaped_modules(event)
                     if (cleaner == 'ImageCleanerSST'):
                         charge_to_nsb = config['mean_charge_to_nsb_rate'][tel_string]
                         for setting in charge_to_nsb:
@@ -320,9 +320,17 @@ def main():
                             if image_processor.clean.nsb_level >= min_charge:
                                 break
                         logging.info('Average charge from the first batch of pedestal events is %f which corresponds to NSB level %s in %s', image_processor.clean.nsb_level, nsb_rate, tel_string)
+                        
+                ### REAL START OF THE LOOP
 
                 event.trigger.tels_with_trigger = [tel]
 
+                # Here we swap  wrongly connected modules 
+                #  swapped modules and corresponding dates
+                # are stored in /data/inverted_module_list.json
+                for mask_1, mask_2 in swaped_modules_list:
+                    event = swap_modules_r0wf(event,mask_1, mask_2, tel=tel)
+                    
                 event = calibrator_r0_r1.calibrate(event, pedestal_info=pedestal_info)
                 # print(calibrator_r0_r1.pixels_removed) # can be monitored
 
@@ -350,11 +358,7 @@ def main():
                 # SHOULD BE REMOVED as soon as event source can handle this
                 event = add_event_id(event, filename=processing_info.output_file, event_number=i)
 
-                # Here we swap two wrongly connected modules in tel2 after 
-                # camera refurbishment in 2023. Only R1 waveforms are swapped.
-                # The modules were physicaly reconnected in July 2024, so no swapping
-                # after this date (authomatic)
-                event = swap_modules_59_88(event, tel=tel, swap_flag=swap_modules)
+
 
             # For an unknown reason, event.simulation.tel[tel].true_image is sometime None, which kills the rest of the script
             # and simulation histogram is not saved. Here we repace it with an array of zeros.
@@ -401,7 +405,7 @@ def main():
                     event, 
                     window_corr_factors=window_corr_factors, 
                     telescope=tel,
-                    swap_flag=swap_modules
+                    swapped_modules=swaped_modules_list
                     )
 
             image_processor(event) # dl1a->dl1b (hillas parameters)

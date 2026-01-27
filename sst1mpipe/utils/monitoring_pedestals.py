@@ -13,7 +13,7 @@ from ctapipe.calib import CameraCalibrator
 from ctapipe.image import ImageProcessor
 from sst1mpipe.utils import (
     get_subarray,
-    get_swap_flag
+    get_swaped_modules
 )
 
 import logging
@@ -161,7 +161,7 @@ class sliding_pedestals:
                 window_corr_factors, _ = get_window_corr_factors(
                             telescope=tel, config=self.config
                             )
-                swap_modules = get_swap_flag(event)
+                swapped_modules = get_swaped_modules(event)
 
             r0data = event.sst1m.r0.tel[tel]
             if r0data._camera_event_type.value == MON_EVT_TYPE:
@@ -179,7 +179,7 @@ class sliding_pedestals:
                     event,
                     window_corr_factors=window_corr_factors,
                     telescope=tel,
-                    swap_flag=swap_modules
+                    swapped_modules=swapped_modules
                     )
 
                 if jj <= ii:
@@ -240,7 +240,7 @@ class sliding_pedestals:
                 window_corr_factors, _ = get_window_corr_factors(
                             telescope=tel, config=self.config
                             )
-                swap_modules = get_swap_flag(event)
+                swapped_modules = get_swaped_modules(event)
 
             # here we apply gain drop correction
             event = calibrator_r0_r1.calibrate(event, pedestal_info=self)
@@ -259,7 +259,7 @@ class sliding_pedestals:
                   event,
                   window_corr_factors=window_corr_factors,
                   telescope=tel,
-                  swap_flag=swap_modules
+                  swapped_modules=swapped_modules
                   )
 
               if jj <= ii:

@@ -5,10 +5,11 @@ from os import path
 import logging
 from sst1mpipe.utils import (
     get_tel_string, 
-    VAR_to_Idrop
+    VAR_to_Idrop,
     )
 
 import time
+
 
 def get_default_window(telescope=None):
     """
@@ -79,7 +80,7 @@ def get_window_corr_factors(telescope=None, config=None):
 def window_transmittance_correction(
         event, window_corr_factors=None, 
         telescope=None,
-        swap_flag=False
+        swapped_modules=[]
         ):
     """
     Applies window transmittance correction 
@@ -93,9 +94,8 @@ def window_transmittance_correction(
     telescope: int
         Telescope number as in
         event.sst1m.r0.tels_with_data
-    swap_flag: bool
-        Swap (or not) window correction
-        in wrongly connected pixels
+    swapped_modules: list
+        list of masks 
 
     Returns
     -------
@@ -104,26 +104,16 @@ def window_transmittance_correction(
 
     """
 
-    if swap_flag:
+    for mask_1,mask_2 in swapped_modules:
 
-        # module 59
-        mask59 = np.zeros(1296, dtype=bool)
-        mask59[1029] = True
-        mask59[1098:1102+1] = True
-        mask59[1133:1134+1] = True
-        mask59[1064:1067+1] = True
-        window_corr_59 = window_corr_factors[mask59]
+        # module 1
+        window_corr_1 = window_corr_factors[mask_1]
         
-        # module 88
-        mask88 = np.zeros(1296, dtype=bool)
-        mask88[1103] = True
-        mask88[1165:1169+1] = True
-        mask88[1194:1195+1] = True
-        mask88[1135:1138+1] = True
-        window_corr_88 = window_corr_factors[mask88]
+        # module 2
+        window_corr_2 = window_corr_factors[mask_2]
         
-        window_corr_factors[mask59] = window_corr_88
-        window_corr_factors[mask88] = window_corr_59  
+        window_corr_factors[mask_1] = window_corr_2
+        window_corr_factors[mask_2] = window_corr_1  
 
     image_corrected = event.dl1.tel[telescope].image / window_corr_factors
     event.dl1.tel[telescope].image = image_corrected.astype(np.float32) 
