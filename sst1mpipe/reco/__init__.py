@@ -5,6 +5,7 @@ from .reco import (
     plot_feature_importance,
     reco_source_position_sky,
     train_rf_energy,
+    train_rf_energy_stereo,
     train_disp_vector,
     train_disp_norm,
     train_disp_sign,

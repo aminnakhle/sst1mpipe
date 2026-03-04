@@ -2,25 +2,52 @@
 
 """
 A script to train Random Forests on training MC DL1 files. It can train 
-both mono and stereo models. Both are trained per telescope as in the stereo 
-reconstruction the resulting parameters are just averaged. For stereo reconstruction, 
-however, one may use additional features such as h_max or impact_distance as results 
-of geometrical reconstruction.
-- Inputs are MC DL1 diffuse gamma file and MC DL1 diffuse proton file. These are usualy 
-merged from individual DL1 files using sst1mpipe_merge_hdf5 script to reach satisfactory 
-statistics for RF training
-- Outputs are trained models in scikit.learn format (.sav)
+both mono and stereo models. 
+
+STEREO MODES:
+- Standard Stereo (--stereo): Trains per-telescope energy regressors, but includes stereo features (h_max, impact_distance)
+- True Stereo (--stereo --true-stereo): Trains a SINGLE energy regressor using combined features from BOTH telescopes
+
+Both are trained with disp_norm reconstruction (no disp_sign in stereo). For true stereo reconstruction, 
+a single energy regressor is trained using features from both telescopes simultaneously, enabling better
+multi-telescope energy estimation compared to averaging individual telescope predictions.
+
+Inputs are MC DL1 diffuse gamma file and MC DL1 diffuse proton file. These are usually 
+merged from individual DL1 files using sst1mpipe_merge_hdf5 script to reach satisfactory
+statistics for RF training.
+
+Outputs are trained models in scikit-learn format (.sav).
 
 Usage:
 
-$> python sst1mpipe_mc_train_rfs.py
---input-file-gamma gamma_200_300E3GeV_30_30deg_training_dl1.h5
---input-file-proton proton_400_500E3GeV_30_30deg_training_dl1.h5
---output-dir ./
---config sst1mpipe_config.json
---telescope tel_001
---plot-features
---stereo
+# Standard monocular training:
+$> python sst1mpipe_mc_train_rfs.py \\
+   --input-file-gamma gamma_30deg_training_dl1.h5 \\
+   --input-file-proton proton_30deg_training_dl1.h5 \\
+   --output-dir ./models_mono/ \\
+   --config sst1mpipe_config.json \\
+   --telescope tel_001 \\
+   --plot-features
+
+# Standard stereo training (per-telescope):
+$> python sst1mpipe_mc_train_rfs.py \\
+   --input-file-gamma gamma_30deg_training_dl1.h5 \\
+   --input-file-proton proton_30deg_training_dl1.h5 \\
+   --output-dir ./models_stereo/ \\
+   --config sst1mpipe_config.json \\
+   --telescope tel_001 \\
+   --stereo \\
+   --plot-features
+
+# TRUE STEREO training (combined single regressor):
+$> python sst1mpipe_mc_train_rfs.py \\
+   --input-file-gamma gamma_30deg_training_dl1.h5 \\
+   --input-file-proton proton_30deg_training_dl1.h5 \\
+   --output-dir ./models_true_stereo/ \\
+   --config sst1mpipe_config.json \\
+   --telescope tel_001 \\
+   --stereo --true-stereo \\
+   --plot-features
 
 """
 
@@ -90,6 +117,15 @@ def parse_args():
                         dest='stereo'
                         )
 
+    parser.add_argument(
+                        '--true-stereo',
+                        action='store_true',
+                        help='Train TRUE STEREO energy regressor using combined features from both telescopes. '
+                             'This trains a single energy regressor on data from both tel_001 and tel_002, '
+                             'instead of training separate regressors per-telescope.',
+                        dest='true_stereo'
+                        )
+
     args = parser.parse_args()
     return args
 
@@ -103,6 +139,7 @@ def main():
     telescope = args.telescope
     plot = args.plot
     stereo = args.stereo
+    true_stereo = args.true_stereo
 
     check_outdir(outdir)
 
@@ -121,6 +158,12 @@ def main():
     shutil.copyfile(args.config_file, output_cfgfile)
 
     logging.info('Training Random Forests for Telescope %s', telescope)
+    
+    # Check for conflicting options
+    if true_stereo and not stereo:
+        logging.warning('--true-stereo flag set but --stereo flag is not set.')
+        logging.warning('Enabling --stereo automatically for compatibility...')
+        stereo = True
 
     params_gamma = load_dl1_sst1m(input_file_gamma, tel=telescope, config=config, table='pandas', check_finite=True, stereo=stereo, quality_cuts=True)
     if input_file_proton is not None:
@@ -128,7 +171,18 @@ def main():
     else: 
         params_protons = None
 
-    train_models(params_gamma, params_protons, config=config, plot=plot, outdir=outdir, telescope=telescope, stereo=stereo)
+    # For true stereo, also load data from the other telescope for energy training
+    params_gamma_tel2 = None
+    params_protons_tel2 = None
+    if true_stereo:
+        other_telescope = 'tel_002' if telescope == 'tel_001' else 'tel_001'
+        logging.info('Loading data from %s for TRUE STEREO energy training...', other_telescope)
+        params_gamma_tel2 = load_dl1_sst1m(input_file_gamma, tel=other_telescope, config=config, table='pandas', check_finite=True, stereo=stereo, quality_cuts=True)
+        if input_file_proton is not None:
+            params_protons_tel2 = load_dl1_sst1m(input_file_proton, tel=other_telescope, config=config, table='pandas', check_finite=True, stereo=stereo, quality_cuts=True)
+
+    train_models(params_gamma, params_protons, config=config, plot=plot, outdir=outdir, telescope=telescope, stereo=stereo, 
+                 true_stereo=true_stereo, params_gamma_tel2=params_gamma_tel2, params_protons_tel2=params_protons_tel2)
     
 if __name__ == '__main__':
     main()

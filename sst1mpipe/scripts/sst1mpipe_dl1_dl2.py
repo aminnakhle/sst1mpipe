@@ -156,8 +156,8 @@ def main():
             models_dir_auto = get_closest_rf_model(dl1, models_dir=models_dir)
             try:
                 dl2_0 = pd.concat([dl2_0, apply_models(dl1, models_dir=models_dir_auto, config=config, telescope=tel, stereo=stereo, mc=ismc)])
-            except:
-                logging.error('RF application failed.')
+            except Exception as err:
+                logging.exception('RF application failed for %s: %s', tel, err)
                 os.remove(output_file)
                 exit()
 
@@ -165,7 +165,7 @@ def main():
         # Now we need to group everything per event and calculate averages.
         # For arrival dirrection, we apply MARS like reconstruction
         #try:
-        dl2 = stereo_reconstruction(dl2_0, config=config, ismc=ismc, telescopes=telescopes)
+        dl2 = stereo_reconstruction(dl2_0, config=config, ismc=ismc, telescopes=telescopes, models_dir=models_dir_auto)
         #except:
         #    logging.error('Stereo reconstruction failed.')
         #    os.remove(output_file)
@@ -195,8 +195,8 @@ def main():
             models_dir_auto = get_closest_rf_model(dl1, models_dir=models_dir)
             try:
                 dl2 = apply_models(dl1, models_dir=models_dir_auto, config=config, telescope=tel, stereo=stereo, mc=ismc)
-            except:
-                logging.error('RF application failed.')
+            except Exception as err:
+                logging.exception('RF application failed for %s: %s', tel, err)
                 os.remove(output_file)
                 exit()
 
