@@ -8,6 +8,12 @@ import glob
 import os
 import matplotlib.pyplot as plt
 import pandas as pd
+from sst1mpipe.reco.stereo_training import (
+    build_true_stereo_feature_table,
+    build_true_stereo_training_table,
+    predict_true_stereo_energy_from_tables,
+    predict_true_stereo_energy,
+)
 from sst1mpipe.utils import (
     camera_to_altaz, 
     disp_to_pos, 
@@ -336,7 +342,7 @@ def train_rf_separation(
 
 def train_rf_energy_stereo(
         data_tel1, data_tel2, config=None, plot=False,
-        outdir=None):
+    outdir=None, max_events=None):
     """
     Train RF Regressor for TRUE STEREO energy reconstruction using combined features from both telescopes.
     
@@ -356,6 +362,8 @@ def train_rf_energy_stereo(
         If True, plot feature importances
     outdir: str
         Output directory path
+    max_events: int, optional
+        Maximum number of coincident events used for training.
 
     Returns
     -------
@@ -387,39 +395,34 @@ def train_rf_energy_stereo(
     elif stereo_only_features:
         logging.info("TRUE STEREO mode enabled, keeping stereo-specific features: %s", stereo_only_features)
     
-    # Get the true energy target from tel_001 (should be same for both telescopes in coincident events)
-    true_energy = data_tel1['log_true_energy'].values
-    
-    # Prepare feature names for both telescopes
     features_tel1 = base_features
     features_tel2 = ['tel_002_' + feat for feat in base_features]
-    
     all_features = features_tel1 + features_tel2
+
     logging.info("Combined features from both telescopes: %d total features", len(all_features))
     logging.info("Tel_001 features (%d): %s", len(features_tel1), features_tel1[:5])
     logging.info("Tel_002 features (%d): %s", len(features_tel2), features_tel2[:5])
-    
-    # Create combined dataframe with features from both telescopes
-    # Rename tel_002 features with prefix before merging
-    data_tel2_renamed = data_tel2[base_features].copy()
-    data_tel2_renamed.columns = features_tel2
-    
-    # Ensure both dataframes have the same index for concatenation
-    data_tel1_subset = data_tel1[features_tel1].copy().reset_index(drop=True)
-    data_tel2_renamed = data_tel2_renamed.reset_index(drop=True)
-    
-    # Combine features from both telescopes
-    combined_data = pd.concat([data_tel1_subset, data_tel2_renamed], axis=1)
-    
+
+    combined_data = build_true_stereo_training_table(
+        data_tel1=data_tel1,
+        data_tel2=data_tel2,
+        base_features=base_features,
+        join_keys=("obs_id", "event_id"),
+        target_col="log_true_energy",
+    )
+
     logging.info("Combined data shape: %s", combined_data.shape)
-    logging.info("Number of events for training: %d", len(combined_data))
-    
-    # Check for missing values
-    missing_count = combined_data.isnull().sum().sum()
-    if missing_count > 0:
-        logging.warning("Found %d missing values in combined data, dropping affected rows", missing_count)
-        combined_data = combined_data.dropna()
-        true_energy = true_energy[:len(combined_data)]
+
+    if len(combined_data) == 0:
+        raise ValueError('No matched true stereo events available after merge and NaN filtering.')
+
+    if max_events is not None:
+        max_events = int(max_events)
+        if len(combined_data) > max_events:
+            combined_data = combined_data.sample(n=max_events)
+        logging.info("TRUE STEREO training sample: N matched events = %d", len(combined_data))
+
+    true_energy = combined_data['log_true_energy'].values
     
     # Train the stereo regressor
     logging.info("Training stereo regressor on combined data...")
@@ -448,8 +451,18 @@ def train_rf_energy_stereo(
     feature_mapping = {
         'tel_001_features': features_tel1,
         'tel_002_features': features_tel2,
-        'all_features': all_features
+        'all_features': all_features,
+        # Canonical convention: tel_001 role maps to the first selected telescope table,
+        # tel_002 role maps to the second selected telescope table.
+        'tel_role_policy': 'sorted_by_tel_id',
+        'expected_n_telescopes': 2,
     }
+    if ('tel_id' in data_tel1.columns) and ('tel_id' in data_tel2.columns):
+        tel1_ids = sorted(data_tel1['tel_id'].dropna().unique().tolist())
+        tel2_ids = sorted(data_tel2['tel_id'].dropna().unique().tolist())
+        if (len(tel1_ids) == 1) and (len(tel2_ids) == 1):
+            feature_mapping['expected_tel_ids'] = [int(tel1_ids[0]), int(tel2_ids[0])]
+
     feature_map_path = outdir + '/reg_energy_stereo_features.pkl'
     joblib.dump(feature_mapping, feature_map_path, compress=3)
     logging.info("Feature mapping saved to: %s", feature_map_path)
@@ -497,6 +510,8 @@ def train_models(
     gp_ratio = config["analysis"]["gamma_to_proton_training_ratio"]
     gamma_training_sample = get_event_sample(params_gamma, max_events=N_training_events)
 
+    keys = ['obs_id', 'event_id']
+
     # Training models
     if (config['disp_method'] == 'disp_vector') & (not stereo):
         train_disp_vector(gamma_training_sample, config=config, plot=plot, outdir=outdir, telescope=telescope, stereo=stereo)
@@ -526,12 +541,14 @@ def train_models(
         logging.info("Training a SINGLE regressor using combined features from both telescopes")
         logging.info("This will replace the standard per-telescope energy regressors")
         
-        # Prepare training sample for true stereo energy regression
-        gamma_training_sample_tel2 = get_event_sample(params_gamma_tel2, max_events=N_training_events)
-        
+        gamma_tel1_for_stereo = params_gamma
+        gamma_tel2_for_stereo = params_gamma_tel2
+        if telescope == 'tel_002':
+            gamma_tel1_for_stereo, gamma_tel2_for_stereo = params_gamma_tel2, params_gamma
+
         train_rf_energy_stereo(
-            gamma_training_sample, gamma_training_sample_tel2,
-            config=config, plot=plot, outdir=outdir
+            gamma_tel1_for_stereo, gamma_tel2_for_stereo,
+            config=config, plot=plot, outdir=outdir, max_events=N_training_events
         )
         logging.info("="*70)
     else:
@@ -548,23 +565,81 @@ def train_models(
 
             #N_gammas_train = int(len(gamma_training_sample)/2.)
             gamma_train_temp, gamma_test_temp = train_test_split(gamma_training_sample, test_size=0.33, random_state=42)
+            params_protons_for_gh = params_protons.copy()
+
+            allow_gh_fallback = config.get('analysis', {}).get('true_stereo_gh_allow_fallback', True)
+            use_true_stereo_for_gh = (
+                true_stereo
+                and params_gamma_tel2 is not None
+                and params_protons_tel2 is not None
+            )
+
+            if use_true_stereo_for_gh:
+                gamma_coinc = build_true_stereo_feature_table(
+                    gamma_training_sample,
+                    params_gamma_tel2,
+                    base_features=[],
+                    join_keys=('obs_id', 'event_id'),
+                )
+                proton_coinc = build_true_stereo_feature_table(
+                    params_protons,
+                    params_protons_tel2,
+                    base_features=[],
+                    join_keys=('obs_id', 'event_id'),
+                )
+
+                if (len(gamma_coinc) == 0) or (len(proton_coinc) == 0):
+                    msg = 'No coincident gamma/proton events for TRUE STEREO g/h training energy path.'
+                    if allow_gh_fallback:
+                        logging.warning(msg + ' Falling back to per-telescope temporary energy model.')
+                        use_true_stereo_for_gh = False
+                    else:
+                        raise RuntimeError(msg + ' Fallback disabled by analysis.true_stereo_gh_allow_fallback=False.')
+                else:
+                    gamma_keys = gamma_coinc[keys].drop_duplicates()
+                    proton_keys = proton_coinc[keys].drop_duplicates()
+                    gamma_train_keys, gamma_test_keys = train_test_split(gamma_keys, test_size=0.33, random_state=42)
+
+                    gamma_train_temp = pd.merge(gamma_training_sample, gamma_train_keys, on=keys, how='inner')
+                    gamma_test_temp = pd.merge(gamma_training_sample, gamma_test_keys, on=keys, how='inner')
+                    gamma_train_temp_tel2 = pd.merge(params_gamma_tel2, gamma_train_keys, on=keys, how='inner')
+                    gamma_test_temp_tel2 = pd.merge(params_gamma_tel2, gamma_test_keys, on=keys, how='inner')
+
+                    params_protons_for_gh = pd.merge(params_protons, proton_keys, on=keys, how='inner')
+                    params_protons_tel2_for_gh = pd.merge(params_protons_tel2, proton_keys, on=keys, how='inner')
+
+                    logging.info(
+                        'TRUE STEREO g/h energy path enabled: gamma coincidences=%d (train=%d, test=%d), proton coincidences=%d',
+                        len(gamma_keys),
+                        len(gamma_train_temp),
+                        len(gamma_test_temp),
+                        len(proton_keys),
+                    )
+            elif true_stereo:
+                msg = 'TRUE STEREO requested, but secondary telescope samples are missing for g/h energy path.'
+                if allow_gh_fallback:
+                    logging.warning(msg + ' Falling back to per-telescope temporary energy model.')
+                else:
+                    raise RuntimeError(msg + ' Fallback disabled by analysis.true_stereo_gh_allow_fallback=False.')
 
             # Training temporary models
             outdir_tmp = outdir + '/tmp/'
             check_outdir(outdir_tmp)
             logging.info('Training temporary models for energy and disp_norm reco for training of g/h separation.')
             train_disp_norm(gamma_train_temp, config=config, plot=plot, outdir=outdir_tmp, telescope=telescope, stereo=stereo)
-            
-            if true_stereo and params_gamma_tel2 is not None:
-                # For true stereo, use the true stereo energy model if available
-                if os.path.exists(os.path.join(outdir, 'reg_energy_stereo.sav')):
-                    logging.info('Using TRUE STEREO energy model for g/h separation training...')
-                    # We'll need to prepare the combined data for prediction
-                    # This is handled in the energy prediction step below
-                else:
-                    # Fallback to standard energy model
-                    train_rf_energy(gamma_train_temp, config=config, plot=plot, outdir=outdir_tmp, telescope=telescope, stereo=stereo)
+
+            if use_true_stereo_for_gh:
+                logging.info('Training temporary TRUE STEREO energy regressor for g/h separation training...')
+                train_rf_energy_stereo(
+                    gamma_train_temp,
+                    gamma_train_temp_tel2,
+                    config=config,
+                    plot=False,
+                    outdir=outdir_tmp,
+                    max_events=N_training_events,
+                )
             else:
+                logging.info('Using per-telescope temporary energy regressor for g/h separation training (fallback).')
                 train_rf_energy(gamma_train_temp, config=config, plot=plot, outdir=outdir_tmp, telescope=telescope, stereo=stereo)
 
             # Reco energy and disp
@@ -575,32 +650,77 @@ def train_models(
                 energy_regression_features = remove_stereo(energy_regression_features)
                 disp_regression_features = remove_stereo(disp_regression_features)
 
-            if true_stereo and os.path.exists(os.path.join(outdir, 'reg_energy_stereo.sav')):
-                # Use true stereo energy model
-                logging.info('Loading true stereo energy model: ' + outdir + '/reg_energy_stereo.sav')
-                energy_re = joblib.load(os.path.join(outdir, 'reg_energy_stereo.sav'))
-                feature_map = joblib.load(os.path.join(outdir, 'reg_energy_stereo_features.pkl'))
-                
-                # For prediction with true stereo, we need data from both telescopes
-                # This is complex, so we'll use the per-telescope fallback for g/h training
-                logging.warning('For g/h separation training with true stereo, using fallback per-telescope energy model')
-                train_rf_energy(gamma_train_temp, config=config, plot=False, outdir=outdir_tmp, telescope=telescope, stereo=stereo)
+            if use_true_stereo_for_gh:
+                model_tmp_path = os.path.join(outdir_tmp, 'reg_energy_stereo.sav')
+                fmap_tmp_path = os.path.join(outdir_tmp, 'reg_energy_stereo_features.pkl')
+                if not (os.path.exists(model_tmp_path) and os.path.exists(fmap_tmp_path)):
+                    msg = 'Temporary TRUE STEREO energy model artifacts missing for g/h training.'
+                    if allow_gh_fallback:
+                        logging.warning(msg + ' Falling back to per-telescope temporary energy model.')
+                        use_true_stereo_for_gh = False
+                    else:
+                        raise RuntimeError(msg + ' Fallback disabled by analysis.true_stereo_gh_allow_fallback=False.')
+                else:
+                    logging.info('Applying temporary TRUE STEREO energy model for g/h separation training...')
+                    energy_re_tmp = joblib.load(model_tmp_path)
+                    feature_map_tmp = joblib.load(fmap_tmp_path)
+
+                    gamma_energy = predict_true_stereo_energy(
+                        gamma_test_temp,
+                        gamma_test_temp_tel2,
+                        model=energy_re_tmp,
+                        feature_map=feature_map_tmp,
+                        join_keys=('obs_id', 'event_id'),
+                    )
+                    proton_energy = predict_true_stereo_energy(
+                        params_protons_for_gh,
+                        params_protons_tel2_for_gh,
+                        model=energy_re_tmp,
+                        feature_map=feature_map_tmp,
+                        join_keys=('obs_id', 'event_id'),
+                    )
+
+                    gamma_test_temp = pd.merge(gamma_test_temp, gamma_energy, on=keys, how='left')
+                    params_protons_for_gh = pd.merge(params_protons_for_gh, proton_energy, on=keys, how='left')
+
+                    missing_gamma = int(gamma_test_temp['log_reco_energy'].isna().sum())
+                    missing_protons = int(params_protons_for_gh['log_reco_energy'].isna().sum())
+                    logging.info(
+                        'TRUE STEREO g/h energy provenance: gamma rows=%d (missing=%d), proton rows=%d (missing=%d)',
+                        len(gamma_test_temp),
+                        missing_gamma,
+                        len(params_protons_for_gh),
+                        missing_protons,
+                    )
+
+                    if (missing_gamma > 0) or (missing_protons > 0):
+                        logging.warning(
+                            'TRUE STEREO energy missing for %d gamma and %d proton rows in g/h training. Dropping those rows.',
+                            missing_gamma,
+                            missing_protons,
+                        )
+                        gamma_test_temp = gamma_test_temp.dropna(subset=['log_reco_energy'])
+                        params_protons_for_gh = params_protons_for_gh.dropna(subset=['log_reco_energy'])
+
+            if not use_true_stereo_for_gh:
                 energy_re = joblib.load(os.path.join(outdir_tmp, 'reg_energy_' + str(telescope) + '.sav'))
+                logging.info('Loading model: ' + outdir_tmp + '/reg_energy_' + str(telescope) + '.sav')
+                logging.info('Temporary per-telescope energy reconstruction for g/h separation training (fallback)..')
+                gamma_test_temp['log_reco_energy'] = energy_re.predict(gamma_test_temp[energy_regression_features])
+                params_protons_for_gh['log_reco_energy'] = energy_re.predict(params_protons_for_gh[energy_regression_features])
+
+            if use_true_stereo_for_gh:
+                logging.info('g/h training will use TRUE STEREO event-level log_reco_energy semantics.')
             else:
-                energy_re = joblib.load(os.path.join(outdir_tmp, 'reg_energy_' + str(telescope) + '.sav'))
-            
-            logging.info('Loading model: ' + outdir_tmp + '/reg_energy_' + str(telescope) + '.sav')
-            logging.info('Temporary energy reconstruction for g/h separation training..')
-            gamma_test_temp['log_reco_energy'] = energy_re.predict(gamma_test_temp[energy_regression_features])
-            params_protons['log_reco_energy'] = energy_re.predict(params_protons[energy_regression_features])
+                logging.info('g/h training uses fallback per-telescope log_reco_energy semantics.')
 
             disp_re = joblib.load(os.path.join(outdir_tmp, 'reg_disp_norm_' + str(telescope) + '.sav'))
             logging.info('Loading model: ' + outdir_tmp + '/reg_disp_norm_' + str(telescope) + '.sav')
             logging.info('Temporary DISP norm reconstruction for g/h separation training..')
             gamma_test_temp['reco_disp_norm'] = disp_re.predict(gamma_test_temp[disp_regression_features])
-            params_protons['reco_disp_norm'] = disp_re.predict(params_protons[disp_regression_features])
+            params_protons_for_gh['reco_disp_norm'] = disp_re.predict(params_protons_for_gh[disp_regression_features])
 
-            gh_training_dataset = mix_gamma_proton(gamma_test_temp, params_protons, max_events=N_training_events, gp_training_ratio=gp_ratio)
+            gh_training_dataset = mix_gamma_proton(gamma_test_temp, params_protons_for_gh, max_events=N_training_events, gp_training_ratio=gp_ratio)
             gh_training_dataset = get_finite(gh_training_dataset, config=config, stereo=stereo)
 
             train_rf_separation(gh_training_dataset, config=config, plot=plot, outdir=outdir, telescope=telescope, stereo=stereo)
@@ -795,7 +915,7 @@ def apply_models(
     return dl2
 
 
-def apply_true_stereo_energy_model(params, models_dir=None):
+def apply_true_stereo_energy_model(params, models_dir=None, config=None):
     """
     Apply TRUE STEREO energy model (if present) on stereo event table.
 
@@ -822,38 +942,81 @@ def apply_true_stereo_energy_model(params, models_dir=None):
     energy_re = joblib.load(model_path)
     feature_map = joblib.load(fmap_path)
 
-    features_tel1 = feature_map['tel_001_features']
-    features_tel2 = feature_map['tel_002_features']
-    all_features = feature_map['all_features']
+    analysis_cfg = (config or {}).get('analysis', {})
+    requested_tel_ids = analysis_cfg.get('true_stereo_energy_tel_ids')
 
-    tel_ids = sorted(params['tel_id'].unique())
+    tel_ids = sorted(params['tel_id'].dropna().unique())
     if len(tel_ids) < 2:
         logging.warning('TRUE STEREO energy model found but less than two telescopes are present in input table.')
         return None
 
-    tel1_id, tel2_id = tel_ids[0], tel_ids[1]
+    tel1_id, tel2_id = None, None
+    if requested_tel_ids is not None:
+        if len(requested_tel_ids) != 2:
+            logging.warning('analysis.true_stereo_energy_tel_ids must have exactly two entries, got: %s', requested_tel_ids)
+            return None
+        requested_tel_ids = [int(requested_tel_ids[0]), int(requested_tel_ids[1])]
+        if not set(requested_tel_ids).issubset(set(tel_ids)):
+            logging.warning(
+                'Requested TRUE STEREO tel_ids %s are not available in input tel_ids=%s.',
+                requested_tel_ids,
+                tel_ids,
+            )
+            return None
+        tel1_id, tel2_id = requested_tel_ids[0], requested_tel_ids[1]
+    else:
+        role_policy = feature_map.get('tel_role_policy', 'sorted_by_tel_id')
+        expected_tel_ids = feature_map.get('expected_tel_ids')
+        if (expected_tel_ids is not None) and (len(expected_tel_ids) == 2):
+            expected_tel_ids = [int(expected_tel_ids[0]), int(expected_tel_ids[1])]
+            if set(expected_tel_ids).issubset(set(tel_ids)):
+                tel1_id, tel2_id = expected_tel_ids[0], expected_tel_ids[1]
+            else:
+                logging.warning(
+                    'Expected TRUE STEREO tel_ids %s from feature map are not available in input tel_ids=%s. '
+                    'Falling back to sorted-by-id role assignment.',
+                    expected_tel_ids,
+                    tel_ids,
+                )
 
-    tel1_data = params[params['tel_id'] == tel1_id][['obs_id', 'event_id'] + features_tel1].copy()
+        if (tel1_id is None) or (tel2_id is None):
+            if role_policy != 'sorted_by_tel_id':
+                logging.warning('Unknown TRUE STEREO role policy "%s". Falling back to sorted-by-id role assignment.', role_policy)
+            if len(tel_ids) > 2:
+                logging.warning(
+                    'More than two telescopes present (%s). TRUE STEREO energy will use the two smallest tel_ids by convention.',
+                    tel_ids,
+                )
+            tel1_id, tel2_id = int(tel_ids[0]), int(tel_ids[1])
 
-    tel2_source_features = [f.replace('tel_002_', '', 1) for f in features_tel2]
-    tel2_data = params[params['tel_id'] == tel2_id][['obs_id', 'event_id'] + tel2_source_features].copy()
-    tel2_data = tel2_data.rename(columns={src: dst for src, dst in zip(tel2_source_features, features_tel2)})
+    logging.info(
+        'TRUE STEREO telescope role mapping: tel_001 role <- tel_id=%d, tel_002 role <- tel_id=%d',
+        tel1_id,
+        tel2_id,
+    )
 
-    combined = pd.merge(tel1_data, tel2_data, on=['obs_id', 'event_id'])
-    combined = combined.dropna(subset=all_features)
+    tel1_data = params[params['tel_id'] == tel1_id].copy()
+    tel2_data = params[params['tel_id'] == tel2_id].copy()
 
-    if len(combined) == 0:
+    energy_table = predict_true_stereo_energy_from_tables(
+        data_tel1=tel1_data,
+        data_tel2=tel2_data,
+        model=energy_re,
+        feature_map=feature_map,
+        join_keys=('obs_id', 'event_id'),
+    )
+
+    if len(energy_table) == 0:
         logging.warning('TRUE STEREO energy model found but no valid coincident events after feature selection.')
         return None
 
-    logging.info('Applying TRUE STEREO energy model on %d coincident events.', len(combined))
-    combined['log_reco_energy'] = energy_re.predict(combined[all_features])
-    return combined[['obs_id', 'event_id', 'log_reco_energy']]
+    logging.info('Applying TRUE STEREO energy model on %d coincident events.', len(energy_table))
+    return energy_table
 
 
 def stereo_reconstruction(
         params, config=None, 
-        ismc=False, telescopes=None, models_dir=None):
+    ismc=False, telescopes=None, models_dir=None, use_true_stereo_energy=None):
     """
     Averages energy and gammaness stereoscopicly reconstructed for 
     each telescope to get final stereo quantities for each event.
@@ -901,11 +1064,23 @@ def stereo_reconstruction(
         axis=1,
     ).reset_index()
 
+    if use_true_stereo_energy is None:
+        use_true_stereo_energy = config.get('analysis', {}).get('use_true_stereo_energy', True)
+
     true_stereo_energy = None
-    if models_dir is not None:
-        true_stereo_energy = apply_true_stereo_energy_model(params, models_dir=models_dir)
-        if true_stereo_energy is not None:
-            logging.info('TRUE STEREO energy estimates will be used instead of per-telescope energy averages.')
+    if use_true_stereo_energy:
+        if models_dir is not None:
+            true_stereo_energy = apply_true_stereo_energy_model(params, models_dir=models_dir, config=config)
+            if true_stereo_energy is not None:
+                logging.info('TRUE STEREO energy mode enabled: using event-level true-stereo energy estimates.')
+            else:
+                logging.warning(
+                    'TRUE STEREO energy mode enabled, but model/predictions unavailable. Falling back to per-telescope average energy.'
+                )
+        else:
+            logging.warning('TRUE STEREO energy mode enabled, but models_dir is not set. Falling back to per-telescope average energy.')
+    else:
+        logging.info('TRUE STEREO energy mode disabled by config/function switch. Using per-telescope average energy.')
 
     dl2 = get_stereo_dl2(params, ismc=ismc)
 
@@ -930,9 +1105,6 @@ def stereo_reconstruction(
 
     dl2.drop(
         columns=[
-            'log_reco_energy_avg',
-            'log_reco_energy_var',
-            'log_reco_energy_wvar',
             'gammaness_avg',
             'gammaness_var',
             'gammaness_wvar',

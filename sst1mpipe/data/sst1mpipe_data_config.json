@@ -64,6 +64,7 @@
       "n_training_events": 5E5,
       "gamma_to_proton_training_ratio": 1.0,
       "reco_energy_scaling_factor": 1.0,
+      "use_true_stereo_energy": true,
       "stereo_reco_weights": "camera_frame_hillas_intensity",
       "observation_time_h": 50,
       "off_regions": 5,
