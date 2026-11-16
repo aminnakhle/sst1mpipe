@@ -4,7 +4,7 @@ from astropy.time import Time
 from astropy.table import QTable
 
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import KFold, train_test_split
 import joblib
 import glob
 import os
@@ -35,6 +35,10 @@ from sst1mpipe.io import (
     write_dl1_pedestals
 )
 from sst1mpipe.analysis import add_reco_ra_dec
+from sst1mpipe.reco.stereo_meta import (
+    build_stereo_energy_meta_training_table_from_oof,
+    apply_stereo_energy_meta_model_from_tables,
+)
 
 from ctaplot.ana import (
     angular_separation_altaz, 
@@ -123,18 +127,9 @@ def train_rf_energy(
     """
 
     logging.info("Training Random Forest Regressor for Energy Reconstruction...")
-    energy_regression_args = config['random_forest_regressor_args']
-    features = config['energy_regression_features']
-
-    if not stereo:
-        features = remove_stereo(features)
-
-    logging.info("Given features: %s", features)
     logging.info("Number of events for training: %d", len(data))
 
-    reg = RandomForestRegressor(**energy_regression_args)
-    reg.fit(data[features],
-            data['log_true_energy'])
+    reg, features = fit_rf_energy_regressor(data, config=config, stereo=stereo)
 
     logging.info("Energy reconstruction model trained!")
 
@@ -143,6 +138,356 @@ def train_rf_energy(
 
     joblib.dump(reg, outdir + '/reg_energy_' + str(telescope) + '.sav', compress=3)
     del reg
+
+
+def fit_rf_energy_regressor(data, config=None, stereo=False):
+    """
+    Fit RF regressor for energy reconstruction without saving to disk.
+
+    Parameters
+    ----------
+    data: pandas.DataFrame
+    config: dict
+    stereo: bool
+
+    Returns
+    -------
+    tuple
+        (fitted RandomForestRegressor, ordered feature list)
+    """
+
+    energy_regression_args = config['random_forest_regressor_args']
+    features = list(config['energy_regression_features'])
+
+    if not stereo:
+        features = remove_stereo(features)
+
+    logging.info("Given features: %s", features)
+    reg = RandomForestRegressor(**energy_regression_args)
+    reg.fit(data[features], data['log_true_energy'])
+    return reg, features
+
+
+def _subset_on_event_keys(data, event_keys, join_keys=("obs_id", "event_id")):
+    if event_keys.empty:
+        return data.iloc[0:0].copy()
+    return pd.merge(data, event_keys, on=list(join_keys), how='inner')
+
+
+def _load_stereo_base_models(models_dir):
+    """
+    Load pre-trained stage-1 per-telescope energy models for meta-only mode.
+    
+    Parameters
+    ----------
+    models_dir: str
+        Directory containing reg_energy_tel_001.sav and reg_energy_tel_002.sav
+    
+    Returns
+    -------
+    dict
+        {'tel_001': model, 'tel_002': model} or raises KeyError if missing
+    """
+    models = {}
+    for tel in ['tel_001', 'tel_002']:
+        path = os.path.join(models_dir, f'reg_energy_{tel}.sav')
+        if not os.path.exists(path):
+            raise FileNotFoundError(
+                f'Base stage-1 energy model not found at {path}. '
+                'For meta-only mode, provide pre-trained per-telescope models.'
+            )
+        models[tel] = joblib.load(path)
+        logging.info('Loaded base stage-1 model: %s', path)
+    return models
+
+
+def _sample_coincident_stereo_events(
+    data_tel1,
+    data_tel2,
+    join_keys=("obs_id", "event_id"),
+    max_events=None,
+):
+    """
+    Build deterministic coincident stereo event key table and optionally cap by count.
+    
+    Parameters
+    ----------
+    data_tel1, data_tel2: pd.DataFrame
+    join_keys: tuple
+    max_events: int or None
+    
+    Returns
+    -------
+    pd.DataFrame
+        Deduplicated stereo event keys (obs_id, event_id), optionally capped
+    """
+    keys_tel1 = data_tel1[list(join_keys)].drop_duplicates()
+    keys_tel2 = data_tel2[list(join_keys)].drop_duplicates()
+    stereo_events = pd.merge(keys_tel1, keys_tel2, on=list(join_keys), how='inner')
+    
+    n_total = len(stereo_events)
+    if max_events is not None and n_total > max_events:
+        stereo_events = stereo_events.sample(n=max_events, random_state=42)
+        logging.info(
+            'Capped stereo events: %d total -> %d (via max_events)',
+            n_total,
+            max_events,
+        )
+    else:
+        logging.info('Total coincident stereo events: %d', n_total)
+    
+    return stereo_events.reset_index(drop=True)
+
+
+def train_rf_energy_stereo_meta(
+        data_tel1,
+        data_tel2,
+        config=None,
+        plot=False,
+        outdir=None,
+        telescope_pair=None,
+        training_mode='full_oof',
+        base_models_dir=None):
+    """
+    Train event-level stereo energy meta-regressor.
+    
+    Supports two modes:
+    - 'full_oof': Train fold-local stage-1 models and generate OOF predictions (leakage-safe)
+    - 'meta_only': Load pre-trained stage-1 models and train only stage-2 meta-regressor
+    """
+
+    meta_cfg = config.get('stereo_energy_meta', {})
+    meta_enabled = meta_cfg.get('enabled', False) or (training_mode == 'meta_only')
+    if not meta_enabled:
+        logging.info('Stereo energy meta-regressor disabled in config.')
+        return
+
+    join_keys = tuple(meta_cfg.get('join_keys', ("obs_id", "event_id")))
+    config_mode = meta_cfg.get('training_mode', 'full_oof')
+    
+    if training_mode not in ['full_oof', 'meta_only']:
+        raise ValueError(f'Unknown training_mode: {training_mode}. Use "full_oof" or "meta_only".')
+    if config_mode not in ['full_oof', 'meta_only']:
+        raise ValueError(f'Unknown config training_mode: {config_mode}. Use "full_oof" or "meta_only".')
+    
+    effective_mode = training_mode  # CLI flag overrides config
+    logging.info('Stereo energy meta-regressor training mode: %s', effective_mode)
+    
+    if effective_mode == 'meta_only':
+        if base_models_dir is None:
+            raise ValueError(
+                'meta_only mode requires base_models_dir with pre-trained stage-1 models. '
+                'Provide --base-models-dir /path/to/models/'
+            )
+
+    n_folds = int(meta_cfg.get('n_folds', 5))
+    feature_names = meta_cfg.get('features', [
+        'log_reco_energy_tel1',
+        'log_reco_energy_tel2',
+        'log_reco_energy_mean',
+        'log_reco_energy_weighted',
+        'log_reco_energy_absdiff',
+        'camera_frame_hillas_intensity_tel1',
+        'camera_frame_hillas_intensity_tel2',
+        'leakage_intensity_width_2_tel1',
+        'leakage_intensity_width_2_tel2',
+        'HillasReconstructor_tel_impact_distance_tel1',
+        'HillasReconstructor_tel_impact_distance_tel2',
+        'HillasReconstructor_h_max',
+    ])
+
+    max_training_events = config.get('analysis', {}).get('n_training_events', None)
+    
+    stereo_events = _sample_coincident_stereo_events(
+        data_tel1=data_tel1,
+        data_tel2=data_tel2,
+        join_keys=join_keys,
+        max_events=max_training_events,
+    )
+    n_events = len(stereo_events)
+
+    if n_events < 2:
+        logging.warning('Not enough coincident stereo events to train energy meta-regressor: %d', n_events)
+        return
+
+    # Generate stage-1 predictions for event-level training table
+    if effective_mode == 'full_oof':
+        n_folds = max(2, min(n_folds, n_events))
+        logging.info(
+            'Stage-2 meta training (full_oof): %d stereo events, %d folds, leakage-safe OOF generation',
+            n_events,
+            n_folds,
+        )
+        kfold = KFold(n_splits=n_folds, shuffle=True, random_state=42)
+        oof_tel1 = []
+        oof_tel2 = []
+
+        for i_fold, (train_idx, valid_idx) in enumerate(kfold.split(stereo_events), start=1):
+            fold_train_keys = stereo_events.iloc[train_idx]
+            fold_valid_keys = stereo_events.iloc[valid_idx]
+
+            train_tel1 = _subset_on_event_keys(data_tel1, fold_train_keys, join_keys=join_keys)
+            train_tel2 = _subset_on_event_keys(data_tel2, fold_train_keys, join_keys=join_keys)
+            valid_tel1 = _subset_on_event_keys(data_tel1, fold_valid_keys, join_keys=join_keys).copy()
+            valid_tel2 = _subset_on_event_keys(data_tel2, fold_valid_keys, join_keys=join_keys).copy()
+
+            reg_tel1, features_tel1 = fit_rf_energy_regressor(train_tel1, config=config, stereo=True)
+            reg_tel2, features_tel2 = fit_rf_energy_regressor(train_tel2, config=config, stereo=True)
+
+            valid_tel1['log_reco_energy'] = reg_tel1.predict(valid_tel1[features_tel1])
+            valid_tel2['log_reco_energy'] = reg_tel2.predict(valid_tel2[features_tel2])
+
+            oof_tel1.append(valid_tel1)
+            oof_tel2.append(valid_tel2)
+
+            logging.info(
+                'Stereo energy meta OOF fold %d/%d: %d validation events',
+                i_fold,
+                n_folds,
+                len(fold_valid_keys),
+            )
+
+        oof_tel1 = pd.concat(oof_tel1, ignore_index=True)
+        oof_tel2 = pd.concat(oof_tel2, ignore_index=True)
+        logging.info('Collected OOF predictions: tel1 rows=%d, tel2 rows=%d', len(oof_tel1), len(oof_tel2))
+        
+    else:  # meta_only mode
+        logging.info(
+            'Stage-2 meta training (meta_only): loading pre-trained stage-1 models from %s',
+            base_models_dir,
+        )
+        base_models = _load_stereo_base_models(base_models_dir)
+        
+        # Use the SAME features the stage-1 models were trained with (in stereo context)
+        energy_features = list(config.get('energy_regression_features', []))
+        # Do NOT call remove_stereo() - models were trained with these exact features
+        
+        oof_tel1 = data_tel1.copy()
+        oof_tel2 = data_tel2.copy()
+        
+        logging.info('Applying stage-1 models with features: %s', energy_features[:3])  # Log first 3 for brevity
+        oof_tel1['log_reco_energy'] = base_models['tel_001'].predict(oof_tel1[energy_features])
+        oof_tel2['log_reco_energy'] = base_models['tel_002'].predict(oof_tel2[energy_features])
+        
+        logging.info(
+            'Applied base stage-1 models: tel1 rows=%d, tel2 rows=%d',
+            len(oof_tel1),
+            len(oof_tel2),
+        )
+
+    logging.info('Building stage-2 training table from tel %d rows and tel2 %d rows', len(oof_tel1), len(oof_tel2))
+    logging.info('Expected meta features: %s', feature_names)
+    logging.info('Available tel1 columns: %s', list(oof_tel1.columns)[:15])
+    
+    training_table = build_stereo_energy_meta_training_table_from_oof(
+        data_tel1=oof_tel1,
+        data_tel2=oof_tel2,
+        feature_names=feature_names,
+        join_keys=join_keys,
+        target_col='log_true_energy',
+    )
+    logging.info('Built training table: %d rows', len(training_table))
+    
+    if training_table.empty:
+        logging.warning('Stereo energy meta training table is empty. Skipping model training.')
+        logging.warning('This usually means merge failed or all rows had missing feature values.')
+        return
+
+    logging.info('Number of stage-2 stereo meta training events: %d', len(training_table))
+
+    meta_regression_args = config.get(
+        'random_forest_stereo_meta_regressor_args',
+        config['random_forest_regressor_args'],
+    )
+    meta_regressor = RandomForestRegressor(**meta_regression_args)
+    meta_regressor.fit(training_table[feature_names], training_table['log_true_energy'])
+
+    if plot:
+        plot_feature_importance(
+            meta_regressor,
+            features=feature_names,
+            outfile=os.path.join(outdir, 'reg_energy_stereo_meta_features.png'),
+            telescope='stereo_meta',
+        )
+
+    logging.info('Number of stage-2 stereo meta training events (after sampling): %d', len(training_table))
+    
+    metadata = {
+        'version': 'stereo_energy_meta_v1',
+        'features': feature_names,
+        'join_keys': join_keys,
+        'target_col': 'log_true_energy',
+        'weights_col': 'camera_frame_hillas_intensity',
+        'telescope_pair': telescope_pair,
+        'training_mode': effective_mode,
+    }
+
+    model_path = os.path.join(outdir, 'reg_energy_stereo_meta.sav')
+    features_path = os.path.join(outdir, 'reg_energy_stereo_meta_features.pkl')
+    joblib.dump(meta_regressor, model_path, compress=3)
+    joblib.dump(metadata, features_path, compress=3)
+    logging.info('Stereo energy meta-regressor (%s) stored: %s', effective_mode, model_path)
+    logging.info('Stereo energy meta metadata stored: %s', features_path)
+
+
+def apply_stereo_energy_meta_model(params, models_dir=None, config=None):
+    """
+    Apply event-level stereo energy meta-regressor to per-telescope stereo rows.
+    """
+
+    meta_cfg = config.get('stereo_energy_meta', {})
+    if not meta_cfg.get('enabled', False):
+        return None
+
+    if models_dir is None:
+        logging.warning('Stereo meta-regressor enabled but models_dir is None. Falling back to weighted average.')
+        return None
+
+    model_path = os.path.join(models_dir, 'reg_energy_stereo_meta.sav')
+    features_path = os.path.join(models_dir, 'reg_energy_stereo_meta_features.pkl')
+
+    logging.info(
+        'Stereo energy meta-regressor enabled. Checking model files: model=%s, features=%s',
+        model_path,
+        features_path,
+    )
+
+    if (not os.path.exists(model_path)) or (not os.path.exists(features_path)):
+        logging.warning(
+            'Stereo energy meta model files missing (%s or %s). Falling back to weighted average.',
+            model_path,
+            features_path,
+        )
+        return None
+
+    tel_ids = sorted([int(tel_id) for tel_id in params['tel_id'].dropna().unique()])
+    if len(tel_ids) < 2:
+        logging.warning('Stereo energy meta-regressor requires two telescopes, found %d', len(tel_ids))
+        return None
+
+    tel1_id, tel2_id = tel_ids[0], tel_ids[1]
+    data_tel1 = params[params['tel_id'] == tel1_id].copy()
+    data_tel2 = params[params['tel_id'] == tel2_id].copy()
+
+    meta_model = joblib.load(model_path)
+    metadata = joblib.load(features_path)
+    feature_names = metadata.get('features', meta_cfg.get('features', []))
+    join_keys = tuple(metadata.get('join_keys', ("obs_id", "event_id")))
+    logging.info(
+        'Loaded stereo energy meta-regressor from %s with %d features.',
+        model_path,
+        len(feature_names),
+    )
+
+    pred = apply_stereo_energy_meta_model_from_tables(
+        data_tel1=data_tel1,
+        data_tel2=data_tel2,
+        meta_model=meta_model,
+        feature_names=feature_names,
+        join_keys=join_keys,
+    )
+    logging.info('Stereo energy meta predictions generated for %d events', len(pred))
+    return pred
 
 
 def train_disp_vector(
@@ -350,7 +695,13 @@ def train_rf_misdirection(
 def train_models(
         params_gamma, params_protons, config=None, 
         plot=None, outdir=None, telescope=None, 
-        stereo=False):
+    stereo=False,
+    params_gamma_tel1=None,
+    params_gamma_tel2=None,
+    telescope_pair=None,
+    train_stereo_meta_this_run=False,
+    stereo_meta_training_mode='full_oof',
+    stereo_meta_base_models_dir=None):
     """
     Run training of all RF models on MC gammas and protons
 
@@ -437,6 +788,44 @@ def train_models(
             train_rf_separation(gh_training_dataset, config=config, plot=plot, outdir=outdir, telescope=telescope, stereo=stereo)
     else:
         logging.warning('RF classifier cannot be trained, dus to missing input DL1 proton file!')
+
+    meta_enabled_for_run = config.get('stereo_energy_meta', {}).get('enabled', False) or (stereo_meta_training_mode == 'meta_only')
+    if stereo and meta_enabled_for_run:
+        if train_stereo_meta_this_run:
+            if (params_gamma_tel1 is not None) and (params_gamma_tel2 is not None):
+                logging.info(
+                    'Stereo meta training enabled for this run (primary telescope). '
+                    'Mode: %s. Training stage-2 meta-regressor.',
+                    stereo_meta_training_mode,
+                )
+                train_rf_energy_stereo_meta(
+                    params_gamma_tel1,
+                    params_gamma_tel2,
+                    config=config,
+                    plot=plot,
+                    outdir=outdir,
+                    telescope_pair=telescope_pair,
+                    training_mode=stereo_meta_training_mode,
+                    base_models_dir=stereo_meta_base_models_dir,
+                )
+            else:
+                logging.warning(
+                    'Stereo meta training requested but per-telescope gamma tables are missing. '
+                    'Skipping stage-2 training.'
+                )
+        else:
+            logging.info(
+                'Stereo meta training skipped for this run to avoid duplicate stage-2 training. '
+                '(Not primary telescope run).'
+            )
+        # If meta-only mode, still apply it even if we didn't train it
+        if stereo_meta_training_mode != 'full_oof' and stereo_meta_base_models_dir is None:
+            logging.warning(
+                'Stereo meta training_mode set to %s but no models provided. '
+                'Skipping meta training.',
+                stereo_meta_training_mode,
+            )
+
     logging.info('All Random Forest models trained and stored here: %s', outdir)
 
 
@@ -701,7 +1090,7 @@ def apply_models(
 
 def stereo_reconstruction(
         params, config=None, 
-        ismc=False, telescopes=None):
+    ismc=False, telescopes=None, models_dir=None):
     """
     Averages energy and gammaness stereoscopicly reconstructed for 
     each telescope to get final stereo quantities for each event.
@@ -733,21 +1122,56 @@ def stereo_reconstruction(
 
     dl2 = get_stereo_dl2(params, ismc=ismc)
 
-    dl2['log_reco_energy'] = energy_average
-    dl2['reco_energy'] = 10**energy_average
-    dl2['var_reco_energy'] = (np.log(10)*10**energy_average)**2 * energy_var
-    dl2['wvar_reco_energy'] = (np.log(10)*10**energy_average)**2 * energy_wvar
+    dl2['log_reco_energy_avg'] = energy_average
+    dl2['log_reco_energy'] = dl2['log_reco_energy_avg']
+
+    meta_cfg = config.get('stereo_energy_meta', {})
+    if meta_cfg.get('enabled', False):
+        meta_pred = apply_stereo_energy_meta_model(params, models_dir=models_dir, config=config)
+        if meta_pred is not None and len(meta_pred) > 0:
+            pred_series = meta_pred.set_index(['obs_id', 'event_id'])['log_reco_energy']
+            dl2['log_reco_energy_meta'] = pred_series.reindex(dl2.index)
+            fallback_enabled = meta_cfg.get('fallback_to_weighted_average', True)
+            n_total_events = int(len(dl2))
+            n_meta_events = int(dl2['log_reco_energy_meta'].notna().sum())
+            if fallback_enabled:
+                n_fallback = int(dl2['log_reco_energy_meta'].isna().sum())
+                if n_fallback > 0:
+                    logging.warning('Stereo energy meta missing for %d events, using weighted average fallback.', n_fallback)
+                dl2['log_reco_energy'] = dl2['log_reco_energy_meta'].fillna(dl2['log_reco_energy_avg'])
+                logging.info(
+                    'STEREO_META_USAGE_CONFIRMED: meta used for %d/%d events; weighted-average fallback for %d/%d events.',
+                    n_meta_events,
+                    n_total_events,
+                    n_fallback,
+                    n_total_events,
+                )
+            else:
+                dl2['log_reco_energy'] = dl2['log_reco_energy_meta']
+                logging.info(
+                    'STEREO_META_USAGE_CONFIRMED: meta used for %d/%d events; fallback disabled.',
+                    n_meta_events,
+                    n_total_events,
+                )
+        else:
+            logging.warning('Stereo energy meta-regressor unavailable or produced no predictions. Using weighted average.')
+    else:
+        logging.info('STEREO_META_USAGE_CONFIRMED: disabled in config, using weighted-average stereo energy for all events.')
+
+    dl2['reco_energy'] = 10**dl2['log_reco_energy']
+    dl2['var_reco_energy'] = (np.log(10) * dl2['reco_energy'])**2 * energy_var
+    dl2['wvar_reco_energy'] = (np.log(10) * dl2['reco_energy'])**2 * energy_wvar
     dl2['gammaness'] = gammaness_average
     dl2['var_gammaness'] = gammaness_var
     dl2['wvar_gammaness'] = gammaness_wvar
 
     # We need to add these for event types classificantion
-    if ismc:
-        mask_tel1 = params['tel_id'] == 1
-        mask_tel2 = params['tel_id'] == 2
-    else:
-        mask_tel1 = params['tel_id'] == 21
-        mask_tel2 = params['tel_id'] == 22
+    tel_ids = sorted([int(tel_id) for tel_id in params['tel_id'].dropna().unique()])
+    if len(tel_ids) < 2:
+        raise ValueError('Stereo reconstruction requires two telescope IDs, found {}'.format(tel_ids))
+
+    mask_tel1 = params['tel_id'] == tel_ids[0]
+    mask_tel2 = params['tel_id'] == tel_ids[1]
     hillas_tel1 = params[mask_tel1][["obs_id", "event_id", "HillasReconstructor_tel_impact_distance"]]
     hillas_tel2 = params[mask_tel2][["obs_id", "event_id", "HillasReconstructor_tel_impact_distance"]]
     hillas_tel1 = hillas_tel1.rename(
@@ -1045,7 +1469,7 @@ def get_average_param(params, param=None, weights=None):
         df_sum = df.groupby(["obs_id", "event_id"]).sum()
         average = df_sum["param"] / df.groupby(["obs_id", "event_id"]).size()
         variance = df.groupby(["obs_id", "event_id"]).var()["param"]
-        variance = weighted_variance
+        weighted_variance = variance.copy()
 
     return average, variance, weighted_variance
 

@@ -17,7 +17,6 @@
       "global_theta_cut": 0.2,
       "global_gammaness_cut": 0.6,
       "gamma_efficiency": 0.6,
-      "theta2_efficiency": 0.68,
       "stereo_delta_disp_cut_deg": null,
       "stereo_relative_std_reco_energy_cut": null,
       "stereo_std_gammaness_cut": null,
@@ -169,6 +168,40 @@
         "warm_start": false
       },
 
+    "stereo_energy_meta": {
+      "enabled": false,
+      "training_mode": "full_oof",
+      "n_folds": 5,
+      "fallback_to_weighted_average": true,
+      "features": [
+        "log_reco_energy_tel1",
+        "log_reco_energy_tel2",
+        "log_reco_energy_mean",
+        "log_reco_energy_weighted",
+        "log_reco_energy_absdiff",
+        "camera_frame_hillas_intensity_tel1",
+        "camera_frame_hillas_intensity_tel2",
+        "leakage_intensity_width_2_tel1",
+        "leakage_intensity_width_2_tel2",
+        "HillasReconstructor_tel_impact_distance_tel1",
+        "HillasReconstructor_tel_impact_distance_tel2",
+        "HillasReconstructor_h_max"
+      ]
+    },
+
+    "random_forest_stereo_meta_regressor_args": {
+      "max_depth": 20,
+      "min_samples_leaf": 10,
+      "n_jobs": -1,
+      "n_estimators": 150,
+      "bootstrap": true,
+      "criterion": "squared_error",
+      "min_samples_split": 10,
+      "random_state": 42,
+      "verbose": 0,
+      "warm_start": false
+    },
+
       "random_forest_classifier_args": {
         "max_depth": 30,
         "min_samples_leaf": 10,
@@ -241,39 +274,6 @@
         "camera_frame_hillas_kurtosis",
         "camera_frame_timing_slope",
         "leakage_intensity_width_2"
-      ],
-
-      "misdirection_regression_features_mono": [
-        "log_camera_frame_hillas_intensity",
-        "camera_frame_hillas_width",
-        "camera_frame_hillas_length",
-        "camera_frame_hillas_wl",
-        "camera_frame_hillas_skewness",
-        "camera_frame_hillas_kurtosis",
-        "camera_frame_timing_slope",
-        "leakage_intensity_width_2"
-      ],
-
-      "misdirection_regression_features_stereo": [
-        "log_camera_frame_hillas_intensity_tel1",
-        "camera_frame_hillas_width_tel1",
-        "camera_frame_hillas_length_tel1",
-        "camera_frame_hillas_wl_tel1",
-        "camera_frame_hillas_skewness_tel1",
-        "camera_frame_hillas_kurtosis_tel1",
-        "camera_frame_timing_slope_tel1",
-        "leakage_intensity_width_2_tel1",
-        "HillasReconstructor_tel_impact_distance_tel1",
-        "log_camera_frame_hillas_intensity_tel2",
-        "camera_frame_hillas_width_tel2",
-        "camera_frame_hillas_length_tel2",
-        "camera_frame_hillas_wl_tel2",
-        "camera_frame_hillas_skewness_tel2",
-        "camera_frame_hillas_kurtosis_tel2",
-        "camera_frame_timing_slope_tel2",
-        "leakage_intensity_width_2_tel2",
-        "HillasReconstructor_tel_impact_distance_tel2",
-        "HillasReconstructor_h_max"
-]
+      ]
 
 }

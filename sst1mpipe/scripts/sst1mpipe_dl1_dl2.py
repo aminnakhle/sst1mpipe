@@ -154,6 +154,10 @@ def main():
             else:
             """
             models_dir_auto = get_closest_rf_model(dl1, models_dir=models_dir)
+            meta_enabled = config.get('stereo_energy_meta', {}).get('enabled', False)
+            logging.info('Stereo energy meta enabled in config: %s', meta_enabled)
+            if meta_enabled:
+                logging.info('Stereo energy meta models will be searched in: %s', models_dir_auto)
             try:
                 dl2_0 = pd.concat([dl2_0, apply_models(dl1, models_dir=models_dir_auto, config=config, telescope=tel, stereo=stereo, mc=ismc)])
             except:
@@ -165,7 +169,13 @@ def main():
         # Now we need to group everything per event and calculate averages.
         # For arrival dirrection, we apply MARS like reconstruction
         #try:
-        dl2 = stereo_reconstruction(dl2_0, config=config, ismc=ismc, telescopes=telescopes)
+        dl2 = stereo_reconstruction(
+            dl2_0,
+            config=config,
+            ismc=ismc,
+            telescopes=telescopes,
+            models_dir=models_dir_auto,
+        )
         #except:
         #    logging.error('Stereo reconstruction failed.')
         #    os.remove(output_file)

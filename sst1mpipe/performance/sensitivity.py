@@ -891,7 +891,7 @@ def sensitivity(
     offset = angular_separation(dl2_gamma['true_az_tel'][0] * u.deg, dl2_gamma['true_alt_tel'][0] * u.deg, dl2_gamma['true_az'][0] * u.deg, dl2_gamma['true_alt'][0] * u.deg).to(u.deg)
     logging.info('Point gammas simulated with offset of: %f deg', offset.value)
 
-    mask_gg, mask_gp = get_gammaness_cuts(dl2_gamma, dl2_proton, config=config, method=gammaness_cuts, save_hdf=save_hdf, save_fig=save_fig, outdir=outdir, energy_bins=energy_bins, telescope=telescope, gamma_off=gamma_off)
+    mask_gg, mask_gp = get_gammaness_cuts(dl2_gamma, dl2_proton, config=config, method=gammaness_cuts, save_hdf=save_hdf, save_fig=save_fig, outdir=outdir, telescope=telescope, gamma_off=gamma_off)
 
     if theta2_cuts == 'global':
         theta_cut = config['analysis']['global_theta_cut'] * u.deg
@@ -922,6 +922,7 @@ def sensitivity(
     logging.info(f'N of simulated gamma-like diffuse protons in OFF region (r={theta_cut_p}): {len(protons_off)}')
 
     # get approximate number of gammas in off regions
+    n_gammas_off_observed = 0
     if offset > 0.01 * u.deg and gamma_off:
         if telescope == 'tel_001' or telescope == 'tel_002':
             n_gammas_off_observed = get_n_gammas_off(dl2_gamma[mask_gg], n_off=N_off_regions, theta_cut=theta_cut)
@@ -979,7 +980,7 @@ def sensitivity(
 
         maskp = (protons_off['reco_energy'] * u.TeV > energy_bins[i]) & (protons_off['reco_energy'] * u.TeV <= energy_bins[i+1])
 
-        if theta_cuts == 'global':
+        if theta2_cuts == 'global':
             N_observed_p = sum(protons_off[maskp]['weight']) * area_ratio
         elif theta2_cuts == 'efficiency':
             N_observed_p = sum(protons_off[maskp]['weight']) * area_ratio[i]
@@ -1189,7 +1190,7 @@ def source_time_to_detection(
     # for diffuse protons theta2 is calculated wrt simulated point like gamma source position
     dl2_proton = get_theta(dl2_proton, zero_alt=dl2_gamma['true_alt'][0], zero_az=dl2_gamma['true_az'][0])
 
-    mask_gg, mask_gp = get_gammaness_cuts(dl2_gamma, dl2_proton, config=config, method=gammaness_cuts, energy_bins=energy_bins, telescope=telescope)
+    mask_gg, mask_gp = get_gammaness_cuts(dl2_gamma, dl2_proton, config=config, method=gammaness_cuts, telescope=telescope)
 
     if theta2_cuts == 'global':
         theta_cut = config['analysis']['global_theta_cut'] * u.deg

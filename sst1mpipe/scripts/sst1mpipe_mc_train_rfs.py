@@ -35,6 +35,7 @@ from sst1mpipe.io import (
     load_config,
     check_outdir
 )
+from sst1mpipe.utils import get_telescopes
 from sst1mpipe.reco import (
     train_models
 )
@@ -90,6 +91,23 @@ def parse_args():
                         dest='stereo'
                         )
 
+    parser.add_argument(
+                        '--train-stereo-meta-only',
+                        action='store_true',
+                        help='Train only stage-2 stereo energy meta-regressor (meta-only mode). '
+                             'Requires --base-models-dir pointing to pre-trained stage-1 models.',
+                        dest='train_stereo_meta_only'
+                        )
+
+    parser.add_argument(
+                        '--base-models-dir',
+                        type=str,
+                        dest='base_models_dir',
+                        default=None,
+                        help='Directory containing pre-trained stage-1 energy models (reg_energy_tel_*.sav) '
+                             'for meta-only training mode.',
+                        )
+
     args = parser.parse_args()
     return args
 
@@ -103,6 +121,8 @@ def main():
     telescope = args.telescope
     plot = args.plot
     stereo = args.stereo
+    train_stereo_meta_only = args.train_stereo_meta_only
+    base_models_dir = args.base_models_dir
 
     check_outdir(outdir)
 
@@ -128,7 +148,84 @@ def main():
     else: 
         params_protons = None
 
-    train_models(params_gamma, params_protons, config=config, plot=plot, outdir=outdir, telescope=telescope, stereo=stereo)
+    params_gamma_tel1 = None
+    params_gamma_tel2 = None
+    telescope_pair = None
+    train_stereo_meta_this_run = False
+    stereo_meta_training_mode = 'full_oof'
+    stereo_meta_base_models_dir = None
+    
+    stereo_meta_enabled = config.get('stereo_energy_meta', {}).get('enabled', False) or train_stereo_meta_only
+    if stereo and stereo_meta_enabled:
+        if train_stereo_meta_only and base_models_dir is None:
+            raise ValueError('--train-stereo-meta-only requires --base-models-dir')
+        all_tels = sorted(get_telescopes(input_file_gamma), key=lambda t: int(t.split('_')[-1]))
+        if len(all_tels) >= 2:
+            telescope_pair = (all_tels[0], all_tels[1])
+            
+            # Deterministic: only train meta on primary (first sorted) telescope run
+            is_primary_telescope = telescope == telescope_pair[0]
+            
+            # Determine training mode: CLI flag overrides config
+            if train_stereo_meta_only:
+                stereo_meta_training_mode = 'meta_only'
+                stereo_meta_base_models_dir = base_models_dir
+                train_stereo_meta_this_run = is_primary_telescope
+            else:
+                stereo_meta_training_mode = config.get('stereo_energy_meta', {}).get('training_mode', 'full_oof')
+                train_stereo_meta_this_run = is_primary_telescope
+            
+            if train_stereo_meta_this_run:
+                logging.info(
+                    'Loading stereo gamma tables for meta-regressor training. '
+                    'Telescope pair: %s. Primary telescope (this run): %s. Mode: %s',
+                    telescope_pair,
+                    telescope,
+                    stereo_meta_training_mode,
+                )
+                params_gamma_tel1 = load_dl1_sst1m(
+                    input_file_gamma,
+                    tel=telescope_pair[0],
+                    config=config,
+                    table='pandas',
+                    check_finite=True,
+                    stereo=True,
+                    quality_cuts=True,
+                )
+                params_gamma_tel2 = load_dl1_sst1m(
+                    input_file_gamma,
+                    tel=telescope_pair[1],
+                    config=config,
+                    table='pandas',
+                    check_finite=True,
+                    stereo=True,
+                    quality_cuts=True,
+                )
+            else:
+                logging.info(
+                    'Stereo meta training skipped for this run (not primary telescope). '
+                    'Telescope: %s. Primary: %s.',
+                    telescope,
+                    telescope_pair[0],
+                )
+        else:
+            logging.warning('Stereo meta enabled, but less than two telescopes found in gamma file.')
+
+    train_models(
+        params_gamma,
+        params_protons,
+        config=config,
+        plot=plot,
+        outdir=outdir,
+        telescope=telescope,
+        stereo=stereo,
+        params_gamma_tel1=params_gamma_tel1,
+        params_gamma_tel2=params_gamma_tel2,
+        telescope_pair=telescope_pair,
+        train_stereo_meta_this_run=train_stereo_meta_this_run,
+        stereo_meta_training_mode=stereo_meta_training_mode,
+        stereo_meta_base_models_dir=stereo_meta_base_models_dir,
+    )
     
 if __name__ == '__main__':
     main()
